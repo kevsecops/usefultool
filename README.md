@@ -82,9 +82,14 @@ npm run dev
 Dashboard: http://localhost:3000 (Backend muss auf Port 8000 laufen).
 
 ```bash
-# Production build testen
-cd frontend && npm run build && npm start
+# Production build testen (standalone — nicht `next start` verwenden)
+cd frontend
+rm -rf .next
+npm run build
+npm run start
 ```
+
+`npm run start` startet `node .next/standalone/server.js` (erforderlich wegen `output: "standalone"` in `next.config.ts`). Dev nutzt Turbopack (`npm run dev`); Prod-Build immer nach `rm -rf .next` bauen, falls zuvor `npm run dev` lief — vermischte Artefakte verursachen sonst Runtime-Fehler.
 
 ## Lokaler Start (ohne Docker)
 
