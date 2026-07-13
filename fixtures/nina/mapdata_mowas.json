@@ -1,0 +1,47 @@
+[
+  {
+    "id": "mow.DE-SL-SLS-W038-20260113-000",
+    "version": 11,
+    "startDate": "2026-01-13T11:09:37+00:00",
+    "severity": "Moderate",
+    "urgency": "Immediate",
+    "type": "Alert",
+    "i18nTitle": {
+      "de": "Hochwasserwarnung Saarland",
+      "en": "Flood warning Saarland"
+    },
+    "transKeys": {
+      "event": "BBK-EVC-FLOOD"
+    }
+  },
+  {
+    "id": "mow.DE-BY-MUC-W012-20260710-001",
+    "version": 3,
+    "startDate": "2026-07-10T14:00:00+00:00",
+    "severity": "Minor",
+    "urgency": "Expected",
+    "type": "Alert",
+    "i18nTitle": {
+      "de": "Waldbrandgefahr Bayern",
+      "en": "Wildfire risk Bavaria"
+    },
+    "transKeys": {
+      "event": "BBK-EVC-FIRE"
+    }
+  },
+  {
+    "id": "mow.DE-NW-KOL-W005-20260712-002",
+    "version": 1,
+    "startDate": "2026-07-12T08:30:00+00:00",
+    "severity": "Severe",
+    "urgency": "Immediate",
+    "type": "Alert",
+    "i18nTitle": {
+      "de": "Trinkwasserwarnung Köln",
+      "en": "Drinking water warning Cologne"
+    },
+    "transKeys": {
+      "event": "BBK-EVC-WATER"
+    }
+  }
+]

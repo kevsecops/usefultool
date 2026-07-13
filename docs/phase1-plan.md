@@ -1,7 +1,7 @@
 # Phase 1 Plan — Global Risk Intelligence MVP
 
 > **Datum:** 2026-07-13  
-> **Status:** Zur Freigabe — Kein Anwendungscode in dieser Phase
+> **Status:** Phase 2 freigegeben — Entscheidungen unten eingearbeitet
 
 ---
 
@@ -10,9 +10,9 @@
 ```
 usefultool/
 ├── README.md
-├── .env.example                    # Phase 2
-├── .gitignore                      # Phase 2
-├── docker-compose.yml              # Phase 7
+├── .env.example
+├── .gitignore
+├── docker-compose.yml              # Phase 2: postgres + backend
 ├── docs/
 │   ├── architecture.md
 │   ├── data-model.md
@@ -20,7 +20,7 @@ usefultool/
 │   ├── risk-scoring.md
 │   ├── security.md
 │   ├── phase1-plan.md              # dieses Dokument
-│   ├── llm-analysis.md             # Phase 6
+│   ├── llm-analysis.md             # LLM Kern-Analyseschicht
 │   ├── deployment.md               # Phase 7
 │   └── n8n-integration.md          # Phase 7
 ├── backend/
@@ -148,15 +148,16 @@ Siehe [architecture.md](./architecture.md) für Mermaid-Diagramm.
 | # | Entscheidung | Rationale |
 |---|--------------|-----------|
 | 1 | **Monolith statt Microservices** | MVP-Komplexität, ein Deployment, einfaches Debugging |
-| 2 | **PostgreSQL + PostGIS (SQLite Demo)** | Geo-Queries nativ; SQLAlchemy-Abstraktion für Wechsel |
+| 2 | **PostgreSQL + PostGIS ab Start** | Geo-Queries nativ; Docker Compose für lokale Entwicklung |
 | 3 | **Adapter-Pattern pro Quelle** | Einheitliches Interface, isolierte Quelllogik |
 | 4 | **Fingerprint-basierte Dedup** | Idempotente Ingest-Pipeline ohne Duplikate |
-| 5 | **LLM als optionaler Layer** | System funktioniert vollständig ohne LLM (rule_based) |
+| 5 | **LLM als Kern-Analyseschicht** | Cross-Alert-Musteranalyse + Briefing; regelbasierter Fallback bei Ausfall; `LLM_ENABLED=false` für Tests |
 | 6 | **DEMO_MODE mit Fixtures** | Offline-Demo, Tests, CI ohne externe Abhängigkeit |
 | 7 | **Static Admin Token (MVP)** | Einfach, ausreichend für lokalen Betrieb |
-| 8 | **NOAA als erste Live-Quelle (Phase 3)** | Beste Dokumentation, CAP-konform, stabiler Endpunkt |
-| 9 | **MapLibre GL JS** | Open Source, keine API-Key-Pflicht |
-| 10 | **Serverseitiger API-Fetch** | SSRF-Schutz, Rate-Limit-Kontrolle, kein CORS zu Behörden-APIs |
+| 8 | **NOAA: Full USA `/alerts/active`** | Ein Endpunkt, keine State-Split-Polling-Strategie für MVP |
+| 9 | **NINA: MoWaS + DWD only** | Katwarn/Biwapp aus MVP-Scope |
+| 10 | **MapLibre GL JS** | Open Source, keine API-Key-Pflicht (Frontend Phase 4) |
+| 11 | **Serverseitiger API-Fetch** | SSRF-Schutz, Rate-Limit-Kontrolle, kein CORS zu Behörden-APIs |
 
 ---
 
@@ -309,11 +310,12 @@ Details: [security.md](./security.md)
 
 | # | Frage / Risiko | Empfehlung | Entscheidung nötig |
 |---|----------------|------------|-------------------|
-| 1 | NINA: Nur MoWaS oder auch DWD/Katwarn/Biwapp? | MoWaS + DWD für MVP; Katwarn/Biwapp Phase 7 | ✅ Ja |
-| 2 | NOAA: Alle USA oder State-weise Polling? | `/alerts/active` mit Pagination; bei Rate-Limit State-Split | ✅ Ja |
-| 3 | PostgreSQL ab Start oder SQLite first? | SQLite Phase 2–4, PostgreSQL ab Phase 7 | ✅ Ja |
-| 4 | MapLibre vs. Leaflet? | MapLibre (Vektor, Performance) | ✅ Ja |
-| 5 | LLM-Provider Default? | Mock in Demo; OpenAI-kompatibel in Prod | ✅ Ja |
+| 1 | NINA: Nur MoWaS oder auch DWD/Katwarn/Biwapp? | MoWaS + DWD für MVP | ✅ **MoWaS + DWD** |
+| 2 | NOAA: Alle USA oder State-weise Polling? | `/alerts/active` full USA | ✅ **Full USA** |
+| 3 | PostgreSQL ab Start oder SQLite first? | PostgreSQL + PostGIS ab Phase 2 | ✅ **PostgreSQL** |
+| 4 | MapLibre vs. Leaflet? | MapLibre (Vektor, Performance) | ✅ **MapLibre** |
+| 5 | LLM-Provider Default? | Mock in Demo; OpenAI-kompatibel in Prod | ✅ **Mock / OpenAI-compat** |
+| 6 | LLM optional oder Kern? | LLM Kern-Analyseschicht mit Fallback | ✅ **Kern mit Fallback** |
 | 6 | NINA Community-Doku vs. fehlende offizielle OpenAPI | Community-Doku nutzen, Endpunkte live verifizieren | Informiert |
 | 7 | GDACS 100-Event-Limit ausreichend? | Ja für MVP; SEARCH für Erweiterung | Informiert |
 | 8 | Admin-Token-Rotation? | Manuell für MVP; dokumentieren | Später |
@@ -330,8 +332,9 @@ Details: [security.md](./security.md)
 
 2. **Datenbank**
    - SQLAlchemy Models: `Alert`, `IngestRun`, `Briefing`
+   - PostGIS `geometry` Spalte via geoalchemy2
    - Alembic initiale Migration
-   - SQLite als Default (`DATABASE_URL=sqlite:///./data/alerts.db`)
+   - `DATABASE_URL=postgresql://...` (Docker Compose Default)
 
 3. **Schemas & Normalization**
    - Pydantic `CanonicalAlert` Schema
@@ -367,8 +370,9 @@ Details: [security.md](./security.md)
    - `python -m app.jobs.cli health`
 
 **Phase-2 Definition of Done:**
+- `docker compose up` startet PostgreSQL + Backend
 - `pytest` grün
-- `DEMO_MODE=true` + `ingest` → Alerts in SQLite
+- `DEMO_MODE=true` + `ingest` → Alerts in PostgreSQL
 - `GET /api/v1/alerts` liefert normalisierte Fixture-Daten
 - Admin-Ingest mit Token funktioniert
 
@@ -379,10 +383,10 @@ Details: [security.md](./security.md)
 | Quelle | URL | Status |
 |--------|-----|--------|
 | NINA MoWaS | `https://warnung.bund.de/api31/mowas/mapData.json` | ✅ Live |
+| NINA DWD | `https://warnung.bund.de/api31/dwd/mapData.json` | ✅ Live |
 | NINA Detail | `https://warnung.bund.de/api31/warnings/{id}.json` | ✅ Live |
 | NINA Geo | `https://warnung.bund.de/api31/warnings/{id}.geojson` | ✅ Live |
 | GDACS Events | `https://www.gdacs.org/gdacsapi/api/events/geteventlist/events4app` | ✅ Live |
 | GDACS Search | `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?...` | ✅ Live |
 | GDACS RSS | `https://www.gdacs.org/xml/rss.xml` | ✅ Live |
-| NOAA Active | `https://api.weather.gov/alerts/active` | ✅ Live (UA required) |
-| NOAA by State | `https://api.weather.gov/alerts/active?area=TX` | ✅ Live |
+| NOAA Active | `https://api.weather.gov/alerts/active` | ✅ Live (full USA, UA required) |

@@ -1,10 +1,10 @@
 # Architektur — Global Risk Intelligence MVP
 
-> **Status:** Phase 1 Planungsdokument (kein lauffähiger Code)
+> **Status:** Phase 2 — Backend implementiert (PostgreSQL + PostGIS, Fixture-Ingest, Basis-API)
 
 ## Ziel
 
-Das System aggregiert öffentliche Warnmeldungen aus drei Quellen (Deutschland/NINA, GDACS, NOAA/NWS), normalisiert sie in ein kanonisches Modell, speichert sie lokal, berechnet regelbasierte Risikometriken und erzeugt optional ein LLM-gestütztes Global Risk Briefing. Ein read-only Dashboard visualisiert Warnungen und Briefings.
+Das System aggregiert öffentliche Warnmeldungen aus drei Quellen (Deutschland/NINA MoWaS+DWD, GDACS, NOAA/NWS), normalisiert sie in ein kanonisches Modell, speichert sie in PostgreSQL/PostGIS, berechnet regelbasierte Risikometriken und erzeugt ein **LLM-gestütztes Global Risk Briefing** mit Cross-Alert-Musteranalyse. Regelbasierte Briefings dienen als Fallback. Ein read-only Dashboard (Phase 4, MapLibre GL JS) visualisiert Warnungen und Briefings.
 
 ## Architekturdiagramm
 
@@ -36,13 +36,12 @@ flowchart TB
     end
 
     subgraph Storage["Persistenz"]
-        PG[("PostgreSQL<br/>+ PostGIS")]
-        SQLITE[("SQLite<br/>Demo-Fallback")]
+        PG[("PostgreSQL 16<br/>+ PostGIS")]
     end
 
-    subgraph Frontend["Frontend (Next.js)"]
+    subgraph Frontend["Frontend (Next.js, Phase 4)"]
         DASH["Dashboard"]
-        MAP["Karte<br/>MapLibre/Leaflet"]
+        MAP["Karte<br/>MapLibre GL JS"]
         LIST["Warnungsliste"]
         BRIEF["Briefing-Ansicht"]
     end
@@ -57,9 +56,9 @@ flowchart TB
 
     NORM --> DEDUP --> DB_LAYER
     DB_LAYER --> PG
-    DB_LAYER --> SQLITE
     DB_LAYER --> ANALYSIS
     ANALYSIS --> LLM
+    LLM -.->|"Fallback"| ANALYSIS
     ANALYSIS --> API
     LLM --> API
     JOBS --> Sources
@@ -78,11 +77,11 @@ flowchart TB
 |-------|---------------|----------------|
 | `sources/` | Abruf, Parsing, Quell-spezifisches Mapping | HTTPX, Fixtures |
 | `normalization/` | CAP-nahe Normalisierung, Severity/Category-Mapping | `schemas/`, `models/` |
-| `db/` | SQLAlchemy Session, Repository-Pattern | PostgreSQL/SQLite |
+| `db/` | SQLAlchemy Session, Repository-Pattern | PostgreSQL + PostGIS |
 | `models/` | ORM-Entitäten (Alert, Briefing, IngestRun) | Alembic |
 | `schemas/` | Pydantic Request/Response DTOs | — |
 | `analysis/` | Statistiken, Cluster, Risk Score | `models/` |
-| `llm/` | Provider-Abstraktion, Prompt, Validierung | `analysis/` |
+| `llm/` | **Kern-Analyseschicht** — Cross-Alert-Muster, Briefing; Fallback via `analysis/` | `analysis/` |
 | `api/` | HTTP-Endpunkte, Auth-Middleware | alle Services |
 | `jobs/` | CLI (`ingest`, `briefing`), Cron-Hooks | `sources/`, `analysis/` |
 | `core/` | Config, Logging, Security-Utils | — |
@@ -93,13 +92,12 @@ flowchart TB
 |---------|------|------------|
 | Backend | Python 3.12 + FastAPI | Schnelle API-Entwicklung, Pydantic-Integration, async HTTPX |
 | ORM | SQLAlchemy 2.x + Alembic | Bewährt, DB-agnostisch (SQLite ↔ PostgreSQL) |
-| DB (Prod) | PostgreSQL 16 + PostGIS | Geo-Queries (`bounding_box`, `ST_Intersects`) |
-| DB (Demo) | SQLite + SpatiaLite optional | Einfacher lokaler Start ohne Docker |
-| Frontend | Next.js 14+ App Router, TypeScript | SSR für SEO/Disclaimer, API-Proxy möglich |
-| Karte | MapLibre GL JS | Open Source, keine Pflicht-API-Keys |
+| DB | PostgreSQL 16 + PostGIS | Geo-Queries (`bounding_box`, `ST_Intersects`); ab Phase 2 |
+| Frontend | Next.js 14+ App Router, TypeScript | SSR für SEO/Disclaimer, API-Proxy möglich (Phase 4) |
+| Karte | MapLibre GL JS | Open Source, keine Pflicht-API-Keys (Phase 4) |
 | HTTP Client | HTTPX | Async, Timeouts, Retry |
-| LLM | OpenAI-kompatibel + Ollama + Mock | Flexibel, offline-fähig |
-| Deployment | Docker Compose (Phase 7) | Backend, Frontend, DB getrennt |
+| LLM | OpenAI-kompatibel (Prod) + Mock (Demo) | Kernschicht für Cross-Alert-Analyse; `LLM_ENABLED=false` für Tests |
+| Deployment | Docker Compose | Postgres + Backend ab Phase 2; Frontend Phase 4 |
 
 ## Adapter-Interface
 
@@ -126,7 +124,7 @@ class BaseSourceAdapter(Protocol):
 5. **Fingerprint** — Dedup-Key berechnen
 6. **Upsert** — Insert oder Update nach `fingerprint`; abgelaufene als `is_active=false`
 7. **Analyze** — Stats, Risk Score, Region-Cluster
-8. **Briefing** — Optional LLM oder regelbasierter Fallback
+8. **Briefing** — LLM Cross-Alert-Analyse (primär); regelbasierter Fallback bei Ausfall
 9. **Serve** — Read-only API für Dashboard
 
 ## API-Schichten
@@ -156,12 +154,12 @@ class BaseSourceAdapter(Protocol):
 | Phase | Inhalt |
 |-------|--------|
 | 1 | Planung (dieses Dokument) |
-| 2 | Backend-Grundlage, Fixtures, Basis-API |
-| 3 | Erste reale Quelle (empfohlen: NOAA — stabil, gut dokumentiert) |
-| 4 | Dashboard (Karte, Liste, Detail) |
+| 2 | Backend-Grundlage, PostgreSQL/PostGIS, Fixtures, Basis-API | ✅ |
+| 3 | Live-Quellen (NOAA `/alerts/active` full USA, NINA MoWaS+DWD, GDACS) |
+| 4 | Dashboard (MapLibre GL JS, Liste, Detail) |
 | 5 | Regelbasierte Analyse + Fallback-Briefing |
-| 6 | LLM-Integration |
-| 7 | Weitere Quellen, Docker Compose, Security Review |
+| 6 | LLM-Integration (Cross-Alert-Musteranalyse) |
+| 7 | Weitere Quellen, Security Review, Production Hardening |
 
 ## Verwandte Dokumente
 
@@ -170,3 +168,4 @@ class BaseSourceAdapter(Protocol):
 - [risk-scoring.md](./risk-scoring.md) — Score-Algorithmus
 - [security.md](./security.md) — Threat Model
 - [phase1-plan.md](./phase1-plan.md) — Konsolidierter Phase-1-Plan
+- [llm-analysis.md](./llm-analysis.md) — LLM als Kern-Analyseschicht

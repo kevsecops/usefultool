@@ -1,0 +1,17 @@
+[
+  {
+    "id": "dwd.DE-BW-STG-W100-20260713-001",
+    "version": 2,
+    "startDate": "2026-07-13T06:00:00+00:00",
+    "severity": "Severe",
+    "urgency": "Immediate",
+    "type": "Alert",
+    "i18nTitle": {
+      "de": "Unwetterwarnung Baden-Württemberg",
+      "en": "Severe thunderstorm warning Baden-Württemberg"
+    },
+    "transKeys": {
+      "event": "BBK-EVC-STORM"
+    }
+  }
+]
