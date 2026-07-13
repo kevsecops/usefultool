@@ -37,6 +37,8 @@ async def test_latest_briefing(client, db_session) -> None:
     assert data["overall_risk_score"] > 0
     assert "summary" in data["content"]
     assert len(data["content"]["source_alert_ids"]) > 0
+    assert len(data["content"]["by_source"]) > 0
+    assert all("label" in item and "count" in item for item in data["content"]["by_source"])
 
 
 @pytest.mark.asyncio

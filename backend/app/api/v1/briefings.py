@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.schemas.briefing import BriefingListResponse, BriefingResponse
-from app.services.briefing_service import get_latest_briefing, list_briefings
+from app.services.briefing_service import get_latest_briefing, list_briefings, prepare_briefing_for_response
 
 router = APIRouter(prefix="/api/v1/briefings", tags=["briefings"])
 
 
-def _to_response(briefing) -> BriefingResponse:
+def _to_response(briefing, db: Session) -> BriefingResponse:
+    briefing = prepare_briefing_for_response(db, briefing)
     return BriefingResponse(
         id=briefing.id,
         generated_at=briefing.generated_at,
@@ -28,7 +29,7 @@ def read_latest_briefing(db: Session = Depends(get_db)) -> BriefingResponse:
     briefing = get_latest_briefing(db)
     if not briefing:
         raise HTTPException(status_code=404, detail="No briefing generated yet")
-    return _to_response(briefing)
+    return _to_response(briefing, db)
 
 
 @router.get("", response_model=BriefingListResponse)
@@ -39,7 +40,7 @@ def read_briefings(
 ) -> BriefingListResponse:
     items, total = list_briefings(db, limit=limit, offset=offset)
     return BriefingListResponse(
-        items=[_to_response(b) for b in items],
+        items=[_to_response(b, db) for b in items],
         total=total,
         limit=limit,
         offset=offset,
