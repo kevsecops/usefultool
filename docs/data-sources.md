@@ -1,0 +1,369 @@
+# Datenquellen — Recherche & Mapping
+
+> **Status:** Phase 1 — Endpunkte verifiziert am 2026-07-13 via HTTP-Requests  
+> **Regel:** Keine erfundenen URLs. Inoffizielle/community-Dokumentation ist gekennzeichnet.
+
+---
+
+## 1. Deutschland — NINA / BBK
+
+### Offiziellkeit
+
+| Aspekt | Bewertung |
+|--------|-----------|
+| API-Host | **Offiziell** — `warnung.bund.de` (Bundesamt für Bevölkerungsschutz) |
+| OpenAPI-Doku | **Community** — [nina.api.bund.dev](https://nina.api.bund.dev/) (bundesAPI, reverse-engineered) |
+| CAP-Standard | Warnungsdetails folgen CAP 1.2-ähnlichem JSON-Schema |
+
+### Basis-URL
+
+```
+https://warnung.bund.de/api31
+```
+
+### Primäre Endpunkte (MVP)
+
+| Endpunkt | Methode | Zweck | Verifiziert |
+|----------|---------|-------|-------------|
+| `/mowas/mapData.json` | GET | Aktive MoWaS-Bevölkerungsschutz-Warnungen (Kompaktliste) | ✅ 200 |
+| `/katwarn/mapData.json` | GET | Katwarn-Meldungen | Dokumentiert |
+| `/biwapp/mapData.json` | GET | BIWAPP-Meldungen | Dokumentiert |
+| `/dwd/mapData.json` | GET | DWD-Unwetterwarnungen | ✅ (leer zum Testzeitpunkt) |
+| `/warnings/{identifier}.json` | GET | Vollständige CAP-Detailwarnung | ✅ 200 |
+| `/warnings/{identifier}.geojson` | GET | Geometrie (Polygon) | ✅ 200 |
+| `/dashboard/{ARS}.json` | GET | Regionalübersicht nach Amtlichem Regionalschlüssel | ✅ 200 |
+
+**Identifier-Beispiel:** `mow.DE-SL-SLS-W038-20260113-000` (aus `mapData.json` → Feld `id`)
+
+### Legacy-Endpunkte (nicht primär für MVP)
+
+| Endpunkt | Hinweis |
+|----------|---------|
+| `https://warnung.bund.de/bbk.mowas/{id}.json` | Ältere API-Struktur; ETag-Support |
+| `https://warnung.bund.de/bbk.config/config_rel.json` | Konfiguration |
+| `https://warnung.bund.de/bbk.status/status_{ARS}.json` | Status pro Region |
+
+> Empfehlung: **api31** verwenden; Legacy nur als Fallback dokumentieren.
+
+### Response-Formate
+
+**mapData.json** (Kompaktliste):
+```json
+[{
+  "id": "mow.DE-SL-SLS-W038-20260113-000",
+  "version": 11,
+  "startDate": "2026-01-13T12:09:37+01:00",
+  "severity": "Minor",
+  "urgency": "Immediate",
+  "type": "Update",
+  "i18nTitle": { "de": "...", "en": "..." },
+  "transKeys": { "event": "BBK-EVC-069" }
+}]
+```
+
+**warnings/{id}.json** (CAP-Detail):
+- Felder: `identifier`, `sender`, `sent`, `status`, `msgType`, `info[]` mit `severity`, `urgency`, `certainty`, `category`, `event`, `headline`, `description`, `area[]`
+- HTML in `description` (`<br/>` Tags)
+
+**warnings/{id}.geojson**:
+- `FeatureCollection` mit `Polygon` und `properties.warnId`
+
+### Auth, Rate Limits, Caching
+
+| Aspekt | Wert |
+|--------|------|
+| Authentifizierung | Keine |
+| Rate Limits | Nicht dokumentiert; konservativ: max. 1 Request/10s pro Endpunkt |
+| Caching | `ETag` + `Cache-Control: max-age=10` — Conditional GET empfohlen |
+| User-Agent | Nicht explizit gefordert, aber sinnvoll setzen |
+
+### Adapter-Strategie
+
+1. `fetch_alerts()`: `GET /mowas/mapData.json` + optional `/dwd/mapData.json`
+2. Für jeden Eintrag: `GET /warnings/{id}.json` + `/warnings/{id}.geojson`
+3. `parse_alert()`: CAP-JSON → ParsedAlert
+4. `normalize_alert()`: Severity direkt aus CAP; Category aus `BBK-EVC-*` Event-Codes oder `category[]`
+5. `health_check()`: `GET /mowas/mapData.json` mit Timeout 10s
+
+### Mapping-Notizen
+
+| Quellfeld | Kanonisch |
+|-----------|-----------|
+| `id` | `source_alert_id` |
+| `i18nTitle.de` / `.en` | `title` |
+| `info[0].description` | `description` (HTML sanitizen) |
+| `info[0].severity` | `severity` (CAP → lowercase) |
+| `info[0].urgency` | `urgency` |
+| `info[0].certainty` | `certainty` |
+| `sent` | `issued_at` |
+| `version` | Update-Erkennung |
+| GeoJSON | `geometry`, Zentroid berechnen |
+| — | `country_code` = `DE` |
+
+### Bekannte Limitierungen
+
+- Keine offizielle OpenAPI von BBK; Community-Doku kann hinterherhinken
+- `dashboard/{ARS}` liefert leer für Berlin (110000000000) — regionale Abdeckung variiert
+- DWD-Warnungen zeitweise leer (saisonal)
+- Mehrere parallele Feeds (mowas, katwarn, biwapp) können Überlappungen erzeugen → Dedup wichtig
+
+### Fixture-Strategie
+
+`fixtures/nina/`:
+- `mapdata_mowas.json` — 3–5 realistische Einträge (Hochwasser, Waldbrand, Trinkwasser)
+- `warning_detail_{id}.json` — CAP-Detail pro Fixture
+- `warning_geo_{id}.geojson` — Polygon um deutsche Region
+
+---
+
+## 2. International — GDACS
+
+### Offiziellkeit
+
+| Aspekt | Bewertung |
+|--------|-----------|
+| API | **Offiziell** — [Swagger UI](https://www.gdacs.org/gdacsapi/swagger/index.html) |
+| Dokumentation | [GDACS API Quickstart v2 (PDF)](https://www.gdacs.org/Documents/2025/GDACS_API_quickstart_v2.pdf) |
+| RSS | **Offiziell** — `https://www.gdacs.org/xml/rss.xml` |
+
+### Primäre Endpunkte (MVP)
+
+| Endpunkt | Methode | Zweck | Verifiziert |
+|----------|---------|-------|-------------|
+| `/gdacsapi/api/events/geteventlist/events4app` | GET | Letzte ~100 Events, letzte 4 Tage | ✅ 200 GeoJSON |
+| `/gdacsapi/api/events/geteventlist/SEARCH?{params}` | GET | Gefilterte Suche | ✅ 200 |
+| `/gdacsapi/api/events/geteventdata?eventtype={T}&eventid={ID}` | GET | Event-Detail | ✅ 200 |
+| `/gdacsapi/api/polygons/getgeometry?eventtype={T}&eventid={ID}&episodeid={E}` | GET | Polygon/Track | Dokumentiert |
+| `/xml/rss.xml` | GET | GeoRSS-Feed (Alternative) | ✅ 200 XML |
+
+**Basis:** `https://www.gdacs.org`
+
+**SEARCH-Beispiel:**
+```
+GET https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ&limit=10
+```
+
+**Event-Typen:** `EQ` (Earthquake), `TC` (Tropical Cyclone), `FL` (Flood), `VO` (Volcano), `WF` (Wildfire), `DR` (Drought)
+
+### Response-Format (events4app)
+
+GeoJSON `FeatureCollection`:
+```json
+{
+  "type": "FeatureCollection",
+  "features": [{
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [148.52, -3.22] },
+    "properties": {
+      "eventtype": "EQ",
+      "eventid": 1551590,
+      "episodeid": 1717883,
+      "name": "Earthquake in Papua New Guinea",
+      "alertlevel": "Green",
+      "alertscore": 1,
+      "severitydata": { "severity": 6.4, "severitytext": "Magnitude 6.4M", "severityunit": "M" },
+      "country": "Papua New Guinea",
+      "iso3": "PNG",
+      "fromdate": "2026-07-13T08:53:27",
+      "iscurrent": "true",
+      "url": { "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?..." }
+    }
+  }]
+}
+```
+
+### Auth, Rate Limits, Caching
+
+| Aspekt | Wert |
+|--------|------|
+| Authentifizierung | Keine |
+| Rate Limits | Nicht dokumentiert; GDACS empfiehlt Cache-Nutzung und selektive SEARCH-Queries |
+| Datenumfang | `events4app`: max. 100 Records / 4 Tage |
+| Lizenz | Open data (RSS: "public domain"; API: frei nutzbar laut GDACS-Doku) |
+
+### Adapter-Strategie
+
+1. `fetch_alerts()`: `GET .../events/geteventlist/events4app` (oder SEARCH mit `alertlevel=Orange,Red`)
+2. Optional Detail-Fetch für Geometrie bei TC/FL
+3. `parse_alert()`: GeoJSON Feature → ParsedAlert
+4. `normalize_alert()`:
+   - `source_alert_id` = `{eventtype}-{eventid}-{episodeid}`
+   - `severity` aus `alertlevel`: Green→minor, Orange→moderate/severe, Red→severe/extreme
+   - `category` aus `eventtype`: EQ→earthquake, TC→weather, etc.
+   - `country_code` aus `iso3` → ISO2 lookup
+5. `health_check()`: `GET events4app` mit Timeout 15s
+
+### Mapping-Notizen
+
+| Quellfeld | Kanonisch |
+|-----------|-----------|
+| `eventid` + `episodeid` | `source_alert_id` |
+| `name` | `title` |
+| `description` / `htmldescription` | `description` |
+| `alertlevel` | `severity` |
+| `eventtype` | `category` + `event_type` |
+| `fromdate` | `issued_at` / `starts_at` |
+| `datemodified` | `updated_at_source` |
+| `geometry` | `geometry` (Point) |
+| `url.report` | `source_url` |
+| `iscurrent` | `is_active` |
+
+### Bekannte Limitierungen
+
+- Nur Naturkatastrophen (kein Bevölkerungsschutz)
+- 100-Event-Limit → für MVP ausreichend; für Vollabdeckung SEARCH mit Pagination
+- `iscurrent=false` Events noch in SEARCH sichtbar → filtern
+- Alert-Level ist GDACS-eigen, nicht CAP
+
+### Fixture-Strategie
+
+`fixtures/gdacs/`:
+- `events4app.json` — EQ (Orange), TC (Red), VO (Green)
+- `event_detail_eq.json` — Detail-Response
+- `geometry_tc.json` — Cyclone-Track-Polygon
+
+---
+
+## 3. USA — NOAA / National Weather Service
+
+### Offiziellkeit
+
+| Aspekt | Bewertung |
+|--------|-----------|
+| API | **Offiziell** — [weather.gov API Docs](https://www.weather.gov/documentation/services-web-api) |
+| Alerts | [Alerts Web Service](https://www.weather.gov/documentation/services-web-alerts) |
+| OpenAPI | `https://api.weather.gov/openapi.json` (zeitweise instabil) |
+
+### Basis-URL
+
+```
+https://api.weather.gov
+```
+
+### Primäre Endpunkte (MVP)
+
+| Endpunkt | Methode | Zweck | Verifiziert |
+|----------|---------|-------|-------------|
+| `/alerts/active` | GET | Alle aktiven Warnungen (USA) | ✅ 200 |
+| `/alerts/active?area={STATE}` | GET | Aktive Warnungen pro US-Bundesstaat | ✅ 200 (TX: 5 Alerts) |
+| `/alerts/active?point={lat},{lon}` | GET | Alerts für Koordinate | Dokumentiert |
+| `/alerts/active?zone={UGC}` | GET | Alerts für Zone/County | Dokumentiert |
+| `/alerts` | GET | Historie (7 Tage) | Dokumentiert |
+| `/alerts/{id}` | GET | Einzelwarnung | Dokumentiert |
+
+**Hinweis:** `/alerts/active` redirectet intern zu `/alerts?active=true`.
+
+**CAP XML Alternative:** `Accept: application/cap+xml` oder `application/atom+xml`
+
+### Response-Format
+
+GeoJSON `FeatureCollection` (JSON-LD):
+```json
+{
+  "type": "FeatureCollection",
+  "features": [{
+    "id": "https://api.weather.gov/alerts/urn:oid:...",
+    "geometry": { "type": "Polygon", "coordinates": [[...]] },
+    "properties": {
+      "id": "urn:oid:...",
+      "event": "Flood Advisory",
+      "severity": "Minor",
+      "urgency": "Expected",
+      "certainty": "Likely",
+      "headline": "Flood Advisory issued...",
+      "description": "* WHAT...",
+      "instruction": "Turn around, don't drown...",
+      "areaDesc": "Tarrant, TX",
+      "sent": "2026-07-13T03:33:00-05:00",
+      "effective": "...",
+      "expires": "...",
+      "status": "Actual",
+      "messageType": "Alert",
+      "category": "Met"
+    }
+  }]
+}
+```
+
+### Auth, Rate Limits, Caching
+
+| Aspekt | Wert |
+|--------|------|
+| Authentifizierung | Keine (API-Key geplant für Zukunft) |
+| **User-Agent** | **Pflicht** — ohne UA → HTTP 403 |
+| Rate Limits | Nicht veröffentlicht; Empfehlung: max. 1 Request/30s |
+| Rate-Limit-Fehler | HTTP 403 mit Reference ID (nicht 429) |
+| Caching | `Cache-Control: max-age=5` für `/alerts/active` |
+| Kontakt bei Sperre | sdb.support@noaa.gov |
+
+**Empfohlener User-Agent:**
+```
+GlobalRiskIntelligence/1.0 (contact@example.com)
+```
+
+### Adapter-Strategie
+
+1. `fetch_alerts()`: `GET /alerts/active` (ggf. mehrere State-Queries für Vollständigkeit)
+2. `parse_alert()`: GeoJSON Feature → ParsedAlert
+3. `normalize_alert()`:
+   - CAP `severity`, `urgency`, `certainty` direkt mappen
+   - `event` → `event_type`; Category aus Event-Name (Flood→flood, Tornado→weather, etc.)
+   - `areaDesc` → `location_name`, `region`
+   - `country_code` = `US`
+4. `health_check()`: `GET /alerts/active?area=DC` mit UA-Header
+
+### Mapping-Notizen
+
+| Quellfeld | Kanonisch |
+|-----------|-----------|
+| `properties.id` | `source_alert_id` |
+| `properties.event` | `event_type` |
+| `properties.headline` | `title` |
+| `properties.description` | `description` |
+| `properties.instruction` | `instruction` |
+| `properties.severity` | `severity` |
+| `properties.urgency` | `urgency` |
+| `properties.certainty` | `certainty` |
+| `properties.sent` | `issued_at` |
+| `properties.effective` | `effective_at` |
+| `properties.expires` | `expires_at` |
+| `geometry` | `geometry` |
+| `properties.areaDesc` | `location_name` |
+| Feature `id` URL | `source_url` |
+
+### Bekannte Limitierungen
+
+- Nur USA (+ Territorien)
+- Zone-Query liefert keine County-basierten Polygon-Warnungen → Point-Query bevorzugen für Vollständigkeit
+- Keine Tornado-Watch SEL-Sprache in `/alerts/active`
+- Alaska Marine Alerts fehlen in CAP 1.2
+- Sehr hohes Volumen bei `/alerts/active` (alle USA) → State-weise oder mit Filtern
+
+### Fixture-Strategie
+
+`fixtures/noaa/`:
+- `alerts_active_tx.json` — Flood Advisory, Severe Thunderstorm Warning
+- `alerts_active_ca.json` — Wildfire Warning
+- `alert_detail.json` — Einzelnes Feature
+
+---
+
+## Quellenvergleich
+
+| Kriterium | NINA | GDACS | NOAA |
+|-----------|------|-------|------|
+| Offiziell | Host ja, Doku community | Ja | Ja |
+| Auth | Nein | Nein | Nein (UA Pflicht) |
+| Format | JSON (CAP-like) | GeoJSON | GeoJSON (JSON-LD) |
+| Geo-Detail | Separate GeoJSON-URL | Point + optional Polygon | Polygon in Feature |
+| Rate Limit | Unbekannt | Unbekannt | ~30s empfohlen |
+| Abdeckung | DE | Global (Natur) | US |
+| DEMO_MODE | Fixtures | Fixtures | Fixtures |
+
+## Ingest-Polling-Empfehlung (Phase 7)
+
+| Quelle | Intervall | Begründung |
+|--------|-----------|------------|
+| NOAA | 60s | Cache max-age=5, Rate-Limit-Vorsicht |
+| NINA | 120s | Cache max-age=10, Detail-Fetches |
+| GDACS | 300s | Langsamere Event-Entwicklung |
