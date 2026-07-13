@@ -16,6 +16,12 @@ from app.models.alert import Alert
 
 SEVERITY_RANK = {"extreme": 4, "severe": 3, "moderate": 2, "minor": 1, "unknown": 0}
 
+SOURCE_LABELS: dict[str, str] = {
+    "nina": "NINA/BBK",
+    "gdacs": "GDACS",
+    "noaa": "NOAA/NWS",
+}
+
 CATEGORY_IMPLICATIONS: dict[str, dict[str, list[str]]] = {
     "flood": {
         "logistics": ["Mögliche Beeinträchtigung von Straßen und Schifffahrtswegen in betroffenen Gebieten."],
@@ -77,15 +83,57 @@ def _top_alerts(alerts: list[Alert], limit: int = 10) -> list[Alert]:
     )[:limit]
 
 
+def _by_source(alerts: list[Alert]) -> list[dict[str, Any]]:
+    from collections import Counter
+
+    counts = Counter(a.source for a in alerts)
+    return [
+        {
+            "source": src,
+            "label": SOURCE_LABELS.get(src, src),
+            "count": count,
+        }
+        for src, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
+def _top_countries(alerts: list[Alert], limit: int = 5) -> list[dict[str, Any]]:
+    from collections import Counter
+
+    counts = Counter(a.country_code for a in alerts if a.country_code)
+    return [{"code": code, "count": count} for code, count in counts.most_common(limit)]
+
+
+def _format_source_counts(by_source: list[dict[str, Any]]) -> str:
+    if not by_source:
+        return ""
+    return ", ".join(f"{item['label']}: {item['count']}" for item in by_source)
+
+
+def _format_top_countries(top_countries: list[dict[str, Any]]) -> str:
+    if not top_countries:
+        return ""
+    return ", ".join(f"{item['code']} ({item['count']})" for item in top_countries)
+
+
 def _build_summary(
     alerts: list[Alert],
     risk: RiskScoreResult,
     hotspots: list[HotspotCluster],
+    *,
+    by_source: list[dict[str, Any]],
+    top_countries: list[dict[str, Any]],
 ) -> str:
     parts = [
         f"{len(alerts)} aktive Warnung{'en' if len(alerts) != 1 else ''} weltweit.",
         f"Global Risk Score: {risk.global_score}/100.",
     ]
+    source_text = _format_source_counts(by_source)
+    if source_text:
+        parts.append(f"Quellen: {source_text}.")
+    country_text = _format_top_countries(top_countries)
+    if country_text:
+        parts.append(f"Top-Länder: {country_text}.")
     if hotspots:
         top = hotspots[0]
         parts.append(
@@ -214,12 +262,19 @@ def _potential_implications(alerts: list[Alert]) -> dict[str, list[str]]:
     return implications
 
 
-def _limitations(anomalies: list[TrendAnomaly]) -> list[str]:
+def _limitations(
+    anomalies: list[TrendAnomaly],
+    *,
+    by_source: list[dict[str, Any]],
+) -> list[str]:
     limits = [
         "Regelbasierte Zusammenfassung ohne semantische Interpretation.",
         "Keine wirtschaftlichen Prognosen — nur konservative Hypothesen.",
         "Implikationen basieren auf Kategorie-Mapping, nicht auf Quelltextanalyse.",
     ]
+    if by_source:
+        source_names = ", ".join(item["label"] for item in by_source)
+        limits.append(f"Datenbasis aus {len(by_source)} Quelle(n): {source_names}.")
     if anomalies:
         limits.append(
             f"{len(anomalies)} Trend-Anomalie(n) erkannt — Verhältnis zu 7-Tage-Durchschnitt geprüft."
@@ -239,6 +294,8 @@ def generate_rule_briefing(
     active = [a for a in alerts if a.is_active]
     now = generated_at or datetime.now(UTC)
     anomalies = anomalies or []
+    by_source = _by_source(active)
+    top_countries = _top_countries(active)
 
     source_ids = [str(a.id) for a in active]
 
@@ -246,8 +303,16 @@ def generate_rule_briefing(
         "generated_at": now.isoformat().replace("+00:00", "Z"),
         "type": "rule_based",
         "overall_risk_score": risk.global_score,
-        "summary": _build_summary(active, risk, hotspots),
+        "summary": _build_summary(
+            active,
+            risk,
+            hotspots,
+            by_source=by_source,
+            top_countries=top_countries,
+        ),
         "overall_confidence": _confidence(active, hotspots),
+        "by_source": by_source,
+        "top_countries": top_countries,
         "affected_regions": _affected_regions(active, hotspots),
         "major_events": _major_events(active),
         "cross_border_patterns": _cross_border_patterns(active, hotspots),
@@ -262,7 +327,7 @@ def generate_rule_briefing(
             for a in anomalies
         ],
         "potential_implications": _potential_implications(active),
-        "limitations": _limitations(anomalies),
+        "limitations": _limitations(anomalies, by_source=by_source),
         "source_alert_ids": source_ids,
         "score_breakdown": risk.breakdown,
     }

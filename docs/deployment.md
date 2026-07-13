@@ -102,20 +102,37 @@ networks:
 
 ## Scheduled Ingest
 
+### Option A — Built-in backend scheduler (container-friendly)
+
+Enable in `.env` or `docker-compose.yml`:
+
+```env
+SCHEDULER_ENABLED=true
+INGEST_INTERVAL_MINUTES=15
+SCHEDULER_GENERATE_BRIEFING=true
+SCHEDULER_STARTUP_DELAY_SECONDS=30
+```
+
+The backend runs ingest (and optional briefing regeneration) on a loop inside the API container. Default interval: **15 minutes**. Disable with `SCHEDULER_ENABLED=false` (default).
+
+### Option B — cron, systemd, or n8n
+
 Use cron, systemd timer, or n8n workflow (see [docs/n8n-integration.md](n8n-integration.md)):
 
 ```bash
-# Every 2 minutes (adjust per source rate limits)
+# Every 15 minutes (adjust per source rate limits)
 docker compose exec -T backend python -m app.jobs.cli ingest
 ```
 
-Recommended polling intervals:
+Recommended polling intervals (per-source minimums — full ingest should not run faster than the slowest constraint):
 
-| Source | Interval | Rationale |
-|--------|----------|-----------|
-| NOAA | 60s | Cache max-age=5, rate-limit caution |
-| NINA | 120s | Detail fetches per alert, cache max-age=10 |
+| Source | Minimum interval | Rationale |
+|--------|------------------|-----------|
+| NOAA | 30–60s | Cache max-age=5, rate-limit caution |
+| NINA | 60–120s | Detail fetches per alert, cache max-age=10 |
 | GDACS | 300s | Slower event evolution, 100-event cap |
+
+For MVP container deployments, `INGEST_INTERVAL_MINUTES=15` is a safe default that respects all three sources.
 
 ## Migrations
 

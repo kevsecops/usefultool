@@ -32,6 +32,7 @@ class StatsResponse(BaseModel):
     by_country: dict[str, int] = Field(default_factory=dict)
     by_category: dict[str, int] = Field(default_factory=dict)
     by_severity: dict[str, int] = Field(default_factory=dict)
+    by_source: dict[str, int] = Field(default_factory=dict)
     top_countries: list[CountryCount] = Field(default_factory=list)
     hotspot_regions: list[HotspotRegion] = Field(default_factory=list)
     trend_anomalies: list[TrendAnomalyItem] = Field(default_factory=list)

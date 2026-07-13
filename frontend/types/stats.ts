@@ -25,6 +25,7 @@ export interface Stats {
   by_country: Record<string, number>;
   by_category: Record<string, number>;
   by_severity: Record<string, number>;
+  by_source: Record<string, number>;
   top_countries: CountryCount[];
   hotspot_regions: HotspotRegion[];
   trend_anomalies: TrendAnomaly[];

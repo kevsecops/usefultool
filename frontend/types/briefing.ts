@@ -5,6 +5,17 @@ export interface AffectedRegion {
   alert_ids: string[];
 }
 
+export interface SourceCount {
+  source: string;
+  label: string;
+  count: number;
+}
+
+export interface CountryCount {
+  code: string;
+  count: number;
+}
+
 export interface MajorEvent {
   title: string;
   severity: string;
@@ -43,6 +54,8 @@ export interface BriefingContent {
   overall_risk_score: number;
   summary: string;
   overall_confidence: "low" | "medium" | "high";
+  by_source: SourceCount[];
+  top_countries: CountryCount[];
   affected_regions: AffectedRegion[];
   major_events: MajorEvent[];
   cross_border_patterns: CrossBorderPattern[];

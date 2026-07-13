@@ -14,6 +14,17 @@ class AffectedRegion(BaseModel):
     alert_ids: list[str] = Field(default_factory=list)
 
 
+class SourceCount(BaseModel):
+    source: str
+    label: str
+    count: int
+
+
+class CountryCount(BaseModel):
+    code: str
+    count: int
+
+
 class MajorEvent(BaseModel):
     title: str
     severity: str
@@ -52,6 +63,8 @@ class BriefingContent(BaseModel):
     overall_risk_score: int = 0
     summary: str = ""
     overall_confidence: str = "low"
+    by_source: list[SourceCount] = Field(default_factory=list)
+    top_countries: list[CountryCount] = Field(default_factory=list)
     affected_regions: list[AffectedRegion] = Field(default_factory=list)
     major_events: list[MajorEvent] = Field(default_factory=list)
     cross_border_patterns: list[CrossBorderPattern] = Field(default_factory=list)

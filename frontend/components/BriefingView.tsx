@@ -1,6 +1,6 @@
 import type { Briefing } from "@/types/briefing";
 import type { Stats } from "@/types/stats";
-import { categoryLabel, formatDateTime } from "@/lib/format";
+import { categoryLabel, formatDateTime, sourceLabel } from "@/lib/format";
 import Link from "next/link";
 
 interface BriefingViewProps {
@@ -78,10 +78,46 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
           value={content.affected_regions.length}
         />
         <StatCard
-          label="Quell-Warnungen"
-          value={content.source_alert_ids.length}
+          label="Datenquellen"
+          value={content.by_source?.length ?? 0}
         />
       </div>
+
+      {(content.by_source?.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="mb-3 font-semibold text-slate-900">Nach Datenquelle</h3>
+          <ul className="space-y-2">
+            {content.by_source.map((item) => (
+              <li
+                key={item.source}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="text-slate-700">
+                  {item.label || sourceLabel(item.source as Parameters<typeof sourceLabel>[0])}
+                </span>
+                <span className="font-medium text-slate-900">{item.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(content.top_countries?.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="mb-3 font-semibold text-slate-900">Top-Länder</h3>
+          <ul className="space-y-2">
+            {content.top_countries.map((country) => (
+              <li
+                key={country.code}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="text-slate-700">{country.code}</span>
+                <span className="font-medium text-slate-900">{country.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {content.affected_regions.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -116,7 +152,8 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
                   {event.title}
                 </Link>
                 <p className="text-slate-500">
-                  {event.severity} · {event.source}
+                  {event.severity} ·{" "}
+                  {sourceLabel(event.source as Parameters<typeof sourceLabel>[0])}
                   {event.region ? ` · ${event.region}` : ""}
                 </p>
               </li>
@@ -266,7 +303,7 @@ function ImplicationsSection({
 
 function StatsFallback({ stats }: { stats: Stats }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-3">
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h3 className="mb-3 font-semibold text-slate-900">Nach Kategorie</h3>
         <ul className="space-y-2">
@@ -276,6 +313,21 @@ function StatsFallback({ stats }: { stats: Stats }) {
               <li key={cat} className="flex items-center justify-between text-sm">
                 <span className="text-slate-700">
                   {categoryLabel(cat as Parameters<typeof categoryLabel>[0])}
+                </span>
+                <span className="font-medium text-slate-900">{count}</span>
+              </li>
+            ))}
+        </ul>
+      </section>
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h3 className="mb-3 font-semibold text-slate-900">Nach Datenquelle</h3>
+        <ul className="space-y-2">
+          {Object.entries(stats.by_source ?? {})
+            .sort(([, a], [, b]) => b - a)
+            .map(([src, count]) => (
+              <li key={src} className="flex items-center justify-between text-sm">
+                <span className="text-slate-700">
+                  {sourceLabel(src as Parameters<typeof sourceLabel>[0])}
                 </span>
                 <span className="font-medium text-slate-900">{count}</span>
               </li>

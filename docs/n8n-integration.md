@@ -49,11 +49,13 @@ cd /opt/usefultool && docker compose exec -T backend python -m app.jobs.cli inge
 
 ## Recommended Schedule
 
-| Workflow | Cron | Command |
-|----------|------|---------|
-| Full ingest (all sources) | `*/2 * * * *` | `ingest` (every 2 min) |
+When using the **built-in backend scheduler** (`SCHEDULER_ENABLED=true`), set `INGEST_INTERVAL_MINUTES=15` (default). This respects per-source rate limits for a combined ingest of all sources.
+
+| Workflow | Cron / Setting | Command |
+|----------|----------------|---------|
+| Full ingest (all sources) | `INGEST_INTERVAL_MINUTES=15` or `*/15 * * * *` | `ingest` |
 | Health check | `*/5 * * * *` | `health` |
-| Briefing (rule-based) | `0 */6 * * *` | `generate-briefing --type rule_based` |
+| Briefing (rule-based) | automatic if `SCHEDULER_GENERATE_BRIEFING=true` | `generate-briefing --type rule_based` |
 
 When `LLM_ENABLED=true`:
 
