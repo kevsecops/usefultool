@@ -34,8 +34,14 @@ async def test_ingest_is_idempotent(db_session) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ingest_detects_updates(db_session) -> None:
-    await run_ingest(db_session)
+async def test_ingest_detects_updates(db_session, monkeypatch) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("DEMO_MODE", "true")
+    monkeypatch.setenv("NINA_FALLBACK_TO_FIXTURES", "false")
+    get_settings.cache_clear()
+
+    await run_ingest(db_session, sources=["nina"])
     db_session.commit()
 
     alert = db_session.scalar(select(Alert).where(Alert.source == "nina").limit(1))
@@ -44,7 +50,7 @@ async def test_ingest_detects_updates(db_session) -> None:
     alert.title = "Changed title for update test"
     db_session.commit()
 
-    run = await run_ingest(db_session)
+    run = await run_ingest(db_session, sources=["nina"])
     db_session.commit()
     db_session.refresh(alert)
     assert run.alerts_updated >= 1
