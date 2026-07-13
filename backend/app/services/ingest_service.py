@@ -15,6 +15,7 @@ from app.normalization.geometry import geojson_to_wkt_element
 from app.schemas.alert import CanonicalAlert
 from app.schemas.common import IngestRunStatus
 from app.services.alert_active import is_expired
+from app.services.alert_fixture import deactivate_fixture_alerts
 from app.sources.registry import get_adapters
 
 logger = get_logger(__name__)
@@ -143,6 +144,14 @@ async def run_ingest(
     )
     now = utc_now()
     expired_count = deactivate_expired_alerts(db, now)
+    fixture_count = 0
+    if not settings.demo_mode:
+        fixture_count = deactivate_fixture_alerts(db)
+        if fixture_count:
+            logger.info(
+                "Deactivated %d fixture-origin alerts (demo_mode=false)",
+                fixture_count,
+            )
     source_label = "all" if not sources else ",".join(sources)
     run = IngestRun(
         started_at=now,
@@ -195,7 +204,9 @@ async def run_ingest(
             logger.exception("Ingest failed for source %s", adapter.source_id)
             errors.append({"source": adapter.source_id, "error": str(exc)})
 
-    deactivated = expired_count + _deactivate_stale_alerts(db, adapters, seen_keys, now)
+    deactivated = (
+        expired_count + fixture_count + _deactivate_stale_alerts(db, adapters, seen_keys, now)
+    )
 
     run.finished_at = utc_now()
     run.alerts_fetched = fetched

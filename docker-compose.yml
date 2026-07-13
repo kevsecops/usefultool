@@ -29,7 +29,8 @@ services:
     environment:
       # Compose values override .env (localhost URLs in .env are for non-Docker dev)
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/usefultool
-      DEMO_MODE: "true"
+      DEMO_MODE: "false"
+      LOG_FORMAT: json
       NINA_FALLBACK_TO_FIXTURES: "false"
       ADMIN_TOKEN: dev-admin-token
       LOG_LEVEL: INFO
@@ -42,7 +43,7 @@ services:
       NINA_USER_AGENT: "GlobalRiskIntelligence/1.0 (contact@example.com)"
       NINA_BASE_URL: "https://warnung.bund.de/api31"
       GDACS_BASE_URL: "https://www.gdacs.org"
-      # Automatic background ingest + briefing (no manual CLI needed)
+      # Built-in scheduler handles ingest+briefing — n8n is optional (see docs/n8n-integration.md)
       SCHEDULER_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "15"
       SCHEDULER_GENERATE_BRIEFING: "true"
@@ -59,13 +60,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # Traefik labels (uncomment when deploying behind Traefik reverse proxy)
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.usefultool-api.rule=Host(`api.example.com`)"
-    #   - "traefik.http.routers.usefultool-api.entrypoints=websecure"
-    #   - "traefik.http.routers.usefultool-api.tls.certresolver=letsencrypt"
-    #   - "traefik.http.services.usefultool-api.loadbalancer.server.port=8000"
 
   frontend:
     build:
@@ -91,13 +85,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
-    # Traefik labels (uncomment when deploying behind Traefik)
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.usefultool-web.rule=Host(`app.example.com`)"
-    #   - "traefik.http.routers.usefultool-web.entrypoints=websecure"
-    #   - "traefik.http.routers.usefultool-web.tls.certresolver=letsencrypt"
-    #   - "traefik.http.services.usefultool-web.loadbalancer.server.port=3000"
 
 volumes:
   postgres_data:

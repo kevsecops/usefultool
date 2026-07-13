@@ -8,17 +8,22 @@ from sqlalchemy.orm import Session
 from app.analysis.clustering import clusters_to_bonus_details, detect_hotspots
 from app.analysis.risk_score import compute_global_risk_score
 from app.analysis.trends import detect_trend_anomalies, global_rolling_avg
+from app.core.config import get_settings
 from app.models.alert import Alert
 from app.models.ingest_run import IngestRun
 from app.normalization.datetime_utils import utc_now
 from app.schemas.stats import CountryCount, HotspotRegion, StatsResponse, TrendAnomalyItem
 from app.services.alert_active import filter_effectively_active
+from app.services.alert_fixture import is_fixture_alert
 
 
 def get_stats(db: Session) -> StatsResponse:
+    settings = get_settings()
     now = utc_now()
     db_alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
     active_alerts = filter_effectively_active(db_alerts, now=now)
+    if not settings.demo_mode:
+        active_alerts = [alert for alert in active_alerts if not is_fixture_alert(alert)]
 
     by_country: Counter[str] = Counter()
     by_category: Counter[str] = Counter()

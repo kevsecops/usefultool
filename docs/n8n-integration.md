@@ -1,113 +1,81 @@
-# n8n Integration — Scheduled Ingest
+# n8n Integration — Optional Orchestration
 
-> **Status:** Phase 7 — workflow template for production ingest scheduling
+> **Status:** Optional — not required when the built-in scheduler is active
 
-## Overview
+## Primary path: built-in scheduler (MVP default)
 
-n8n can trigger the ingest CLI on a schedule without modifying the application. The backend container exposes all ingest logic via:
+The platform includes a **built-in ingest scheduler** (`SCHEDULER_ENABLED=true` in `docker-compose.yml`). It automatically:
 
-```bash
-python -m app.jobs.cli ingest
-python -m app.jobs.cli health
-python -m app.jobs.cli generate-briefing --type auto
-```
+1. Runs full ingest every `INGEST_INTERVAL_MINUTES` (default 15)
+2. Deactivates expired and fixture-origin alerts (in live mode)
+3. Regenerates the briefing when `SCHEDULER_GENERATE_BRIEFING=true`
 
-## Prerequisites
+**n8n is not required** when this scheduler is enabled. Data fetching, normalization, stats, and briefing are all handled inside the backend container.
 
-- n8n instance with Docker socket access (or SSH access to the host)
-- Global Risk Intelligence stack running (`docker compose up -d`)
-- `ADMIN_TOKEN` configured (not required for ingest CLI, only API admin endpoints)
+## When to use n8n (optional)
 
-## Workflow: Scheduled Ingest
+Use n8n only if you already run it and want **external** orchestration beyond what the built-in scheduler provides:
 
-### Option A — Execute Command (Docker socket)
+| Use case | Why n8n |
+|----------|---------|
+| Visibility | Central workflow dashboard for ops teams |
+| Notifications | Slack/email alerts after ingest completes or fails |
+| Custom logic | Run briefing only when new alerts appear; branch on severity |
+| System integration | Chain ingest with ticketing, PagerDuty, or other tools |
+| Multi-environment | Trigger ingest across several deployments from one workflow |
 
-Use n8n **Execute Command** node:
+n8n does **not** replace source adapters or normalization — it only triggers actions the platform already exposes.
 
-```bash
-docker compose -f /path/to/usefultool/docker-compose.yml exec -T backend python -m app.jobs.cli ingest
-```
+## Trigger options
 
-Schedule: every **2–5 minutes** (see interval recommendations below).
-
-### Option B — HTTP Admin Endpoint
-
-If you expose the admin API (with Traefik IP whitelist):
+### Option A — HTTP Admin Endpoint (recommended for n8n)
 
 ```
 POST /api/v1/admin/ingest
 Header: X-Admin-Token: <ADMIN_TOKEN>
 ```
 
-Use n8n **HTTP Request** node with the admin token stored in n8n credentials.
+Check status afterward:
 
-### Option C — SSH to Host
+```
+GET /api/v1/admin/status
+Header: X-Admin-Token: <ADMIN_TOKEN>
+```
+
+### Option B — Execute Command (Docker socket)
+
+```bash
+docker compose -f /path/to/usefultool/docker-compose.yml exec -T backend python -m app.jobs.cli ingest
+```
+
+### Option C — SSH to host
 
 ```bash
 cd /opt/usefultool && docker compose exec -T backend python -m app.jobs.cli ingest
 ```
 
-## Recommended Schedule
+## If using n8n alongside the built-in scheduler
 
-When using the **built-in backend scheduler** (`SCHEDULER_ENABLED=true`), set `INGEST_INTERVAL_MINUTES=15` (default). This respects per-source rate limits for a combined ingest of all sources.
+Disable the built-in scheduler to avoid duplicate ingests:
 
-| Workflow | Cron / Setting | Command |
-|----------|----------------|---------|
-| Full ingest (all sources) | `INGEST_INTERVAL_MINUTES=15` or `*/15 * * * *` | `ingest` |
-| Health check | `*/5 * * * *` | `health` |
-| Briefing (rule-based) | automatic if `SCHEDULER_GENERATE_BRIEFING=true` | `generate-briefing --type rule_based` |
-
-When `LLM_ENABLED=true`:
-
-| Workflow | Cron | Command |
-|----------|------|---------|
-| LLM briefing | `0 */6 * * *` | `generate-briefing --type auto` |
-
-## Example n8n Workflow (JSON outline)
-
-```json
-{
-  "nodes": [
-    {
-      "name": "Schedule Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "parameters": {
-        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 2 }] }
-      }
-    },
-    {
-      "name": "Run Ingest",
-      "type": "n8n-nodes-base.executeCommand",
-      "parameters": {
-        "command": "docker compose -f /opt/usefultool/docker-compose.yml exec -T backend python -m app.jobs.cli ingest"
-      }
-    },
-    {
-      "name": "Check Exit Code",
-      "type": "n8n-nodes-base.if",
-      "parameters": {
-        "conditions": {
-          "number": [{ "value1": "={{ $json.exitCode }}", "operation": "notEqual", "value2": 0 }]
-        }
-      }
-    }
-  ]
-}
+```env
+SCHEDULER_ENABLED=false
 ```
 
-## Error Handling
+Then schedule n8n to call ingest every 15 minutes (respecting source rate limits — see [data-sources.md](data-sources.md)).
 
-- Ingest returns exit code `1` when all sources fail (`status=failed`)
-- Exit code `0` for `success` or `partial` (some sources succeeded)
-- On `partial`, inspect ingest run errors via admin API or backend logs:
+## Recommended n8n workflows
 
-```bash
-docker compose logs backend --tail 50
-```
+| Workflow | Cron | Command / HTTP |
+|----------|------|----------------|
+| Full ingest | `*/15 * * * *` | `POST /api/v1/admin/ingest` |
+| Health check | `*/5 * * * *` | `GET /health` |
+| Failure notification | On ingest error | Parse `last_ingest_error` from `/health` or `/api/v1/admin/status` |
+| Briefing only | On demand | `POST /api/v1/admin/generate-briefing` |
 
-## Environment for Live Sources
+When `SCHEDULER_GENERATE_BRIEFING=true`, briefing runs automatically after ingest — a separate n8n briefing workflow is usually unnecessary.
 
-Ensure the backend container has:
+## Environment for live sources
 
 ```env
 DEMO_MODE=false
@@ -116,8 +84,16 @@ NOAA_USER_AGENT=GlobalRiskIntelligence/1.0 (ops@yourdomain.com)
 NINA_USER_AGENT=GlobalRiskIntelligence/1.0 (ops@yourdomain.com)
 ```
 
-## Security Notes
+## Security notes
 
-- Do not store `LLM_API_KEY` in n8n unless using n8n encrypted credentials
-- Restrict n8n Execute Command to trusted workflows only
-- Prefer admin HTTP endpoint behind Traefik with IP whitelist over exposing Docker socket to n8n
+- Store `ADMIN_TOKEN` in n8n encrypted credentials
+- Do not expose Docker socket to n8n unless the host is fully trusted
+- Restrict admin API access (firewall, reverse proxy ACLs) in production
+
+## CLI reference (same operations n8n would trigger)
+
+```bash
+python -m app.jobs.cli ingest
+python -m app.jobs.cli health
+python -m app.jobs.cli generate-briefing --type auto
+```

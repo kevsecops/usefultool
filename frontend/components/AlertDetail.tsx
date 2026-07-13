@@ -6,6 +6,7 @@ import {
   severityColor,
   severityLabel,
   sourceLabel,
+  ingestModeLabel,
 } from "@/lib/format";
 import { sanitizeToPlainText } from "@/lib/sanitize";
 import { AlertMiniMap } from "@/components/AlertMiniMap";
@@ -31,6 +32,15 @@ export function AlertDetail({ alert }: AlertDetailProps) {
             </span>
             <span className="text-sm text-slate-500">
               {sourceLabel(alert.source)}
+            </span>
+            <span
+              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                alert.ingest_mode === "fixture"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}
+            >
+              {ingestModeLabel(alert.ingest_mode)}
             </span>
             {alert.country_code && (
               <span className="text-sm text-slate-500">

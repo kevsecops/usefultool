@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     app_version: str = "0.1.0"
     log_level: str = "INFO"
+    log_format: str = "json"
     database_url: str = "postgresql://postgres:postgres@localhost:5432/usefultool"
     demo_mode: bool = False
     fixtures_dir: Path = Path("fixtures")

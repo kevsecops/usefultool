@@ -9,6 +9,9 @@ def test_health(client) -> None:
     data = response.json()
     assert data["status"] in ("ok", "degraded")
     assert data["demo_mode"] is True
+    assert "scheduler" in data
+    assert "alert_counts" in data
+    assert "active_alert_count" in data
 
 
 @pytest.mark.asyncio

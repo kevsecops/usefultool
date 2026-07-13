@@ -63,6 +63,7 @@ export interface Alert {
   raw_payload?: Record<string, unknown> | null;
   fingerprint: string;
   is_active: boolean;
+  ingest_mode?: "live" | "fixture";
 }
 
 export interface AlertListResponse {

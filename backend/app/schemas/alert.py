@@ -83,6 +83,7 @@ class AlertResponse(BaseModel):
     raw_payload: dict[str, Any] | None = None
     fingerprint: str
     is_active: bool
+    ingest_mode: str = "live"
 
 
 class AlertListResponse(BaseModel):
