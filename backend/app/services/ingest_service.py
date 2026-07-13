@@ -434,6 +434,14 @@ async def run_ingest(
 
         gen_briefing(db, briefing_type="auto")
 
+    if settings.correlation_auto_run and run.status in (
+        IngestRunStatus.SUCCESS,
+        IngestRunStatus.PARTIAL,
+    ):
+        from app.services.correlation_service import run_correlation
+
+        run_correlation(db)
+
     return run
 
 

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.jobs import scheduler as scheduler_module
 from app.models.alert import Alert
+from app.models.canonical_event import CanonicalEvent
 from app.models.ingest_run import IngestRun
 from app.models.observed_event import ObservedEvent
 from app.normalization.datetime_utils import utc_now
@@ -127,6 +128,10 @@ def get_health_status(db: Session) -> dict:
         "observed_event_counts": observed_event_counts,
         "active_alert_count": len(public_alerts),
         "active_observed_event_count": sum(observed_event_counts.values()),
+        "canonical_event_count": db.scalar(
+            select(func.count()).select_from(CanonicalEvent).where(CanonicalEvent.is_active.is_(True))
+        )
+        or 0,
     }
 
 

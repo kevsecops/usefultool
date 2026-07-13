@@ -189,6 +189,43 @@ Persistierte Beobachtungen aus dedizierten Event-Feeds (z. B. USGS Erdbeben). Se
 **API:** `GET /api/v1/observed-events`, `GET /api/v1/observed-events/{id}`  
 **Mapping:** [usgs-mapping.md](./usgs-mapping.md)
 
+## CanonicalEvent (Phase 4)
+
+Cross-source aggregation of related alerts and observed events. Source rows are never deleted — only linked.
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|--------------|
+| `id` | UUID | ja | Primärschlüssel |
+| `event_type` | string | nein | z. B. `earthquake`, `wildfire` |
+| `title` | string | ja | Titel vom Primary Member |
+| `status` | string | ja | `active`, `ended` |
+| `severity` | enum | ja | Höchste Severity der Members |
+| `geometry` | GeoJSON | nein | Geometrie vom Primary Member |
+| `spatial_scope` | enum | ja | `local`, `regional`, … |
+| `started_at` | datetime | ja | Frühestes Member-`issued_at` |
+| `updated_at` | datetime | ja | Letzte Korrelation |
+| `ended_at` | datetime | nein | Spätestes Member-Ende |
+| `confidence` | enum | ja | Aggregierte Korrelations-Confidence |
+| `primary_source_id` | UUID | nein | Member-ID des Primary |
+| `correlation_reason` | text | nein | Audit-Trail der Match-Regeln |
+| `correlation_version` | string | ja | Regelversion (aktuell `1`) |
+| `is_active` | bool | ja | Event noch aktiv |
+
+### CanonicalEventLink
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | UUID | |
+| `canonical_event_id` | UUID FK | Zugehöriges kanonisches Event |
+| `member_type` | enum | `alert` oder `observed_event` |
+| `member_id` | UUID | FK auf `alerts.id` oder `observed_events.id` |
+| `link_confidence` | enum | `high`, `medium`, `low` |
+| `link_reason` | text | z. B. `possible_match; geo_proximity` |
+| `created_at` | datetime | |
+
+**API:** `GET /api/v1/events`, `GET /api/v1/events/{id}`, `GET /api/v1/events/{id}/sources`  
+**Korrelation:** [event-correlation.md](./event-correlation.md)
+
 ### SourceStatus (persistent)
 
 | Feld | Typ | Beschreibung |

@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.logging import setup_logging, get_logger
 from app.db.session import SessionLocal
 from app.services.briefing_service import generate_briefing
+from app.services.correlation_service import run_correlation
 from app.services.ingest_service import run_ingest
 from app.sources.registry import get_adapters
 
@@ -77,6 +78,24 @@ async def cmd_health() -> int:
     return 0 if all_healthy else 1
 
 
+async def cmd_correlate() -> int:
+    db = SessionLocal()
+    try:
+        result = run_correlation(db)
+        db.commit()
+        logger.info(
+            "Correlation complete: created=%d updated=%d links=%d possible=%d processed=%d",
+            result.canonical_events_created,
+            result.canonical_events_updated,
+            result.links_created,
+            result.possible_matches,
+            result.members_processed,
+        )
+        return 0
+    finally:
+        db.close()
+
+
 async def cmd_generate_briefing(briefing_type: str = "auto") -> int:
     db = SessionLocal()
     try:
@@ -113,6 +132,8 @@ def main() -> None:
 
     sub.add_parser("health", help="Check database and source health")
 
+    sub.add_parser("correlate", help="Run cross-source event correlation")
+
     briefing_parser = sub.add_parser("generate-briefing", help="Generate risk briefing")
     briefing_parser.add_argument(
         "--type",
@@ -131,6 +152,8 @@ def main() -> None:
         code = asyncio.run(cmd_ingest(args.sources, gen_flag))
     elif args.command == "health":
         code = asyncio.run(cmd_health())
+    elif args.command == "correlate":
+        code = asyncio.run(cmd_correlate())
     elif args.command == "generate-briefing":
         code = asyncio.run(cmd_generate_briefing(args.type))
     else:

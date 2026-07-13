@@ -7,7 +7,9 @@ from app.api.deps import get_db
 from app.core.security import verify_admin_token
 from app.schemas.admin import IngestRequest, IngestResponse
 from app.schemas.briefing import GenerateBriefingRequest, GenerateBriefingResponse
+from app.schemas.canonical_event import CorrelateEventsResponse
 from app.services.briefing_service import generate_briefing
+from app.services.correlation_service import run_correlation
 from app.services.ingest_service import run_ingest
 from app.services.status_service import get_admin_status
 
@@ -36,6 +38,17 @@ async def trigger_ingest(
         alerts_deactivated=run.alerts_deactivated,
         errors=run.errors or [],
     )
+
+
+@router.post(
+    "/correlate-events",
+    response_model=CorrelateEventsResponse,
+    dependencies=[Depends(verify_admin_token)],
+)
+def trigger_correlate_events(db: Session = Depends(get_db)) -> CorrelateEventsResponse:
+    result = run_correlation(db)
+    db.commit()
+    return result
 
 
 @router.post(

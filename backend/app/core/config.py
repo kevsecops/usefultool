@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     scheduler_generate_briefing: bool = True
     scheduler_startup_delay_seconds: int = 30
 
+    correlation_time_window_hours: float = 24.0
+    correlation_distance_km: float = 150.0
+    correlation_auto_run: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:
