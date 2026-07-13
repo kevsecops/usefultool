@@ -74,3 +74,34 @@ def test_briefing_implications_conservative_language() -> None:
     logistics = briefing["potential_implications"]["logistics"]
     assert len(logistics) > 0
     assert any("Mögliche" in s or "Potenzielle" in s for s in logistics)
+
+
+def test_briefing_implications_wildfire_uses_schema_domains() -> None:
+    """Wildfire alerts must not emit non-schema implication keys (e.g. environmental)."""
+    alerts = [
+        _make_alert(
+            category="wildfire",
+            title="Wildfire Warning in Sonoma County",
+            source_alert_id="wf-1",
+            fingerprint="fp-wf",
+        ),
+        _make_alert(
+            category="flood",
+            title="Flood Advisory in Napa County",
+            source_alert_id="fl-1",
+            fingerprint="fp-fl",
+        ),
+    ]
+    risk = compute_global_risk_score(alerts, cluster_bonuses=[], rolling_avg_active=2)
+    briefing = generate_rule_briefing(alerts, risk=risk, hotspots=[])
+
+    implications = briefing["potential_implications"]
+    assert set(implications.keys()) == {
+        "economy",
+        "logistics",
+        "infrastructure",
+        "technology",
+        "finance",
+    }
+    assert len(implications["logistics"]) > 0
+    assert any("Luftqualität" in s for s in implications["infrastructure"])

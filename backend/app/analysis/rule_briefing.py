@@ -27,7 +27,7 @@ CATEGORY_IMPLICATIONS: dict[str, dict[str, list[str]]] = {
     },
     "wildfire": {
         "logistics": ["Mögliche Sperrungen von Verkehrswegen in Brandgebieten."],
-        "environmental": ["Potenzielle Luftqualitätsbelastung in umliegenden Regionen."],
+        "infrastructure": ["Potenzielle Luftqualitätsbelastung in umliegenden Regionen."],
     },
     "earthquake": {
         "infrastructure": ["Mögliche Schäden an Gebäuden und kritischer Infrastruktur."],
@@ -41,6 +41,11 @@ CATEGORY_IMPLICATIONS: dict[str, dict[str, list[str]]] = {
         "economy": ["Mögliche lokale wirtschaftliche Auswirkungen bei Infrastrukturausfällen."],
         "technology": ["Potenzielle Beeinträchtigung digitaler Dienste in betroffenen Gebieten."],
     },
+}
+
+# Legacy/alias domain keys in CATEGORY_IMPLICATIONS mapped to briefing schema domains.
+IMPLICATION_DOMAIN_ALIASES: dict[str, str] = {
+    "environmental": "infrastructure",
 }
 
 
@@ -199,6 +204,9 @@ def _potential_implications(alerts: list[Alert]) -> dict[str, list[str]]:
     for category in categories_present:
         mapping = CATEGORY_IMPLICATIONS.get(category, {})
         for domain, statements in mapping.items():
+            domain = IMPLICATION_DOMAIN_ALIASES.get(domain, domain)
+            if domain not in implications:
+                continue
             for stmt in statements:
                 if stmt not in seen:
                     seen.add(stmt)
