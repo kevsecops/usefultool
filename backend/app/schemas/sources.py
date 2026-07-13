@@ -10,6 +10,8 @@ class SourceInfo(BaseModel):
     name: str
     healthy: bool
     last_fetch: datetime | None = None
+    ingest_mode: str | None = None
+    alerts_fetched: int | None = None
 
 
 class SourcesResponse(BaseModel):

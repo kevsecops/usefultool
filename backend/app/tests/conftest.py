@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-os.environ.setdefault("DEMO_MODE", "true")
+os.environ["DEMO_MODE"] = "true"
+os.environ["NINA_FALLBACK_TO_FIXTURES"] = "false"
 os.environ.setdefault("LLM_ENABLED", "false")
 os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
@@ -26,6 +27,16 @@ from app.main import app
 
 get_settings.cache_clear()
 settings = get_settings()
+
+
+@pytest.fixture(autouse=True)
+def _reset_test_env() -> Generator[None, None, None]:
+    """Ensure each test starts in demo/fixture mode unless it overrides env."""
+    os.environ["DEMO_MODE"] = "true"
+    os.environ["NINA_FALLBACK_TO_FIXTURES"] = "false"
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture(scope="session")

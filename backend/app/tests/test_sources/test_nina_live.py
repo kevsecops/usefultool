@@ -173,6 +173,71 @@ async def test_nina_severity_mapping(monkeypatch, mowas_fixture: list) -> None:
 
 
 @pytest.mark.asyncio
+async def test_nina_empty_live_returns_no_alerts_without_fallback(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.setenv("NINA_USE_FIXTURES", "false")
+    monkeypatch.setenv("NINA_FALLBACK_TO_FIXTURES", "false")
+    get_settings.cache_clear()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/mowas/mapData.json"):
+            return httpx.Response(200, json=[])
+        if request.url.path.endswith("/dwd/mapData.json"):
+            return httpx.Response(200, json=[])
+        return httpx.Response(404)
+
+    client = HttpClient(
+        user_agent="TestAgent/1.0 (test@example.com)",
+        allowed_hosts=frozenset({"warnung.bund.de"}),
+        transport=_make_transport(handler),
+    )
+    adapter = NinaSourceAdapter(http_client=client)
+    raw_alerts = await adapter.fetch_alerts()
+    assert raw_alerts == []
+    assert adapter._last_ingest_mode == "live"
+
+
+@pytest.mark.asyncio
+async def test_nina_fixture_alerts_have_no_source_url(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("DEMO_MODE", "true")
+    monkeypatch.setenv("FIXTURES_DIR", str(FIXTURES_DIR.parent))
+    get_settings.cache_clear()
+
+    adapter = NinaSourceAdapter()
+    raw_alerts = await adapter.fetch_alerts()
+    flood = next(r for r in raw_alerts if "DEMO-SL-FLOOD" in r.data.get("id", ""))
+    canonical = adapter.normalize_alert(adapter.parse_alert(flood))
+    assert canonical.source_url is None
+    assert canonical.raw_payload.get("_ingest_mode") == "fixture"
+
+
+@pytest.mark.asyncio
+async def test_nina_health_check_reports_ingest_mode(monkeypatch, mowas_fixture: list) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.setenv("NINA_USE_FIXTURES", "false")
+    get_settings.cache_clear()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/mowas/mapData.json"):
+            return httpx.Response(200, json=mowas_fixture)
+        return httpx.Response(404)
+
+    client = HttpClient(
+        user_agent="TestAgent/1.0 (test@example.com)",
+        allowed_hosts=frozenset({"warnung.bund.de"}),
+        transport=_make_transport(handler),
+    )
+    adapter = NinaSourceAdapter(http_client=client)
+    await adapter.fetch_alerts()
+    health = await adapter.health_check()
+    assert health.ingest_mode == "live"
+    assert health.alerts_fetched == 3
+
+
+@pytest.mark.asyncio
 async def test_http_client_rejects_non_allowlisted_nina_host() -> None:
     client = HttpClient(
         user_agent="Test/1.0",

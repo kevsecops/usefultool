@@ -31,6 +31,8 @@ async def get_sources(db: Session) -> SourcesResponse:
                 name=_SOURCE_NAMES.get(adapter.source_id, adapter.source_id),
                 healthy=health.is_healthy,
                 last_fetch=last_fetch or health.last_success_at,
+                ingest_mode=health.ingest_mode,
+                alerts_fetched=health.alerts_fetched,
             )
         )
     return SourcesResponse(sources=sources)

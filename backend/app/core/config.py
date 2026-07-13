@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     nina_max_response_bytes: int = 10 * 1024 * 1024
     nina_max_retries: int = 3
     nina_use_fixtures: bool = False
-    nina_fallback_to_fixtures: bool = True
+    nina_fallback_to_fixtures: bool = False
     gdacs_base_url: str = "https://www.gdacs.org"
     gdacs_fetch_timeout_seconds: float = 15.0
     gdacs_max_response_bytes: int = 10 * 1024 * 1024

@@ -4,7 +4,7 @@
     {
       "type": "Feature",
       "properties": {
-        "warnId": "mow.DE-SL-SLS-W038-20260113-000"
+        "warnId": "mow.DEMO-SL-FLOOD-20260713-000"
       },
       "geometry": {
         "type": "Polygon",

@@ -214,10 +214,64 @@ async def test_fixture_dates_refreshed_on_ingest(db_session) -> None:
     db_session.commit()
 
     alert = db_session.scalar(
-        select(Alert).where(Alert.source_alert_id.like("%20260113%")).limit(1)
+        select(Alert).where(Alert.source_alert_id.like("mow.DEMO-%")).limit(1)
     )
     assert alert is not None
     assert alert.expires_at is not None
     assert alert.expires_at > now
     assert alert.is_active is True
+
+
+@pytest.mark.asyncio
+async def test_live_nina_ingest_deactivates_stale_fixture_alerts(db_session, monkeypatch) -> None:
+    """Fixture-origin NINA alerts must be deactivated when not in live feed."""
+    from app.core.config import get_settings
+    from app.sources.nina import NinaSourceAdapter
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.setenv("NINA_USE_FIXTURES", "false")
+    monkeypatch.setenv("NINA_FALLBACK_TO_FIXTURES", "false")
+    get_settings.cache_clear()
+
+    now = utc_now()
+    stale_fixture = Alert(
+        source="nina",
+        source_alert_id="mow.DEMO-SL-FLOOD-20260713-000",
+        title="Hochwasserwarnung Saarland",
+        category="flood",
+        severity="moderate",
+        status="actual",
+        country_code="DE",
+        issued_at=now,
+        expires_at=now + timedelta(hours=24),
+        ingested_at=now,
+        last_seen_at=now,
+        raw_payload={"_ingest_mode": "fixture", "test": True},
+        fingerprint=generate_fingerprint(
+            source="nina",
+            source_alert_id="mow.DEMO-SL-FLOOD-20260713-000",
+            title="Hochwasserwarnung Saarland",
+            issued_at=now,
+            severity="moderate",
+            category="flood",
+        ),
+        is_active=True,
+    )
+    db_session.add(stale_fixture)
+    db_session.commit()
+
+    async def empty_live_fetch(self):
+        self._last_ingest_mode = "live"
+        self._last_fetch_count = 0
+        return []
+
+    monkeypatch.setattr(NinaSourceAdapter, "fetch_alerts", empty_live_fetch)
+
+    run = await run_ingest(db_session, sources=["nina"])
+    db_session.commit()
+    db_session.refresh(stale_fixture)
+
+    assert run.alerts_deactivated >= 1
+    assert stale_fixture.is_active is False
 
