@@ -13,6 +13,7 @@ class RawAlertPayload:
     data: dict[str, Any]
     detail: dict[str, Any] | None = None
     geometry: dict[str, Any] | None = None
+    ingest_mode: str | None = None
 
 
 @dataclass
@@ -31,6 +32,8 @@ class SourceHealth:
     latency_ms: int | None = None
     last_success_at: datetime | None = None
     error_message: str | None = None
+    ingest_mode: str | None = None
+    alerts_fetched: int | None = None
 
 
 class BaseSourceAdapter(Protocol):

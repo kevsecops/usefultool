@@ -68,7 +68,7 @@ Conditional GET: responses include `ETag` and `Cache-Control: max-age=10` — th
 |----------|---------|--------|
 | `DEMO_MODE` | `false` | All sources use fixtures |
 | `NINA_USE_FIXTURES` | `false` | Force NINA fixtures even when live |
-| `NINA_FALLBACK_TO_FIXTURES` | `true` | On live fetch failure, use fixtures if available |
+| `NINA_FALLBACK_TO_FIXTURES` | `false` | On live fetch failure, use fixtures if available (no merge with live data) |
 | `SOURCES_LIVE` | `nina,gdacs,noaa` | Comma-separated live sources when not in demo mode |
 | `NINA_USER_AGENT` | `GlobalRiskIntelligence/1.0` | Sent on all NINA requests |
 | `NINA_BASE_URL` | `https://warnung.bund.de/api31` | API base URL |
@@ -77,9 +77,9 @@ Conditional GET: responses include `ETag` and `Cache-Control: max-age=10` — th
 
 ## Graceful Degradation
 
-When `NINA_FALLBACK_TO_FIXTURES=true` (default) and live fetch fails, the adapter logs a warning and loads `fixtures/nina/mapdata_*.json`. Per-alert detail/geometry fetches that fail are logged and skipped (compact entry still ingested with partial data).
+When `NINA_FALLBACK_TO_FIXTURES=true` and live fetch fails or returns zero alerts, the adapter logs a warning and loads `fixtures/nina/mapdata_*.json`. Per-alert detail/geometry fetches that fail are logged and skipped (compact entry still ingested with partial data). **Fixtures are never merged with a successful live response.**
 
-Set `NINA_FALLBACK_TO_FIXTURES=false` to fail hard instead.
+Set `NINA_FALLBACK_TO_FIXTURES=false` (default) to avoid silent fixture injection in production.
 
 ## Deduplication
 

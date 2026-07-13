@@ -33,7 +33,9 @@ https://warnung.bund.de/api31
 | `/warnings/{identifier}.geojson` | GET | Geometrie (Polygon) | ✅ 200 |
 | `/dashboard/{ARS}.json` | GET | Regionalübersicht nach Amtlichem Regionalschlüssel | ✅ 200 |
 
-**Identifier-Beispiel:** `mow.DE-SL-SLS-W038-20260113-000` (aus `mapData.json` → Feld `id`)
+**Identifier-Beispiel (live):** `mow.DE-SL-SLS-W038-20260113-000` — echte Trinkwasserwarnung Saarlouis (ID-Datum = Erstmeldung, nicht „stale“)
+
+**Fixture-ID (nur Demo):** `mow.DEMO-SL-FLOOD-20260713-000` — fiktive Hochwasserwarnung, **nicht** auf warnung.bund.de
 
 ### Legacy-Endpunkte (nicht primär für MVP)
 
@@ -110,9 +112,23 @@ https://warnung.bund.de/api31
 ### Fixture-Strategie
 
 `fixtures/nina/`:
-- `mapdata_mowas.json` — 3–5 realistische Einträge (Hochwasser, Waldbrand, Trinkwasser)
+- `mapdata_mowas.json` — 3–5 Demo-Einträge (Hochwasser, Waldbrand, Trinkwasser)
 - `warning_detail_{id}.json` — CAP-Detail pro Fixture
 - `warning_geo_{id}.geojson` — Polygon um deutsche Region
+
+**Wichtig:** Demo-Fixtures verwenden `mow.DEMO-*`-IDs, **keine echten NINA-IDs**. Echte IDs (z. B. `mow.DE-SL-SLS-W038-20260113-000`) können monatelang in `mapData.json` bleiben — das Datumssegment ist die Erstmeldung, nicht das Ablaufdatum.
+
+### Live vs. Fixture (Konfiguration)
+
+| Modus | Bedingung | NINA-Verhalten |
+|-------|-----------|----------------|
+| **Demo** | `DEMO_MODE=true` (docker-compose Default) | Nur `fixtures/nina/`, `ingest_mode=fixture`, kein `source_url` |
+| **Live** | `DEMO_MODE=false` + `nina` in `SOURCES_LIVE` | Nur warnung.bund.de API, `ingest_mode=live` |
+| **Fallback** | `NINA_FALLBACK_TO_FIXTURES=true` (Default: **false**) | Fixtures **nur** bei komplettem Live-Fetch-Fehler oder leerer Antwort — **kein Merge** mit Live-Daten |
+
+Bei Live-Ingest werden alle aktiven NINA-Alerts deaktiviert, deren `source_alert_id` nicht in der aktuellen Fetch-Menge ist. Nach Wechsel von Demo → Live verschwinden daher Demo-Fixture-Warnungen beim nächsten Ingest.
+
+`GET /api/v1/sources` liefert pro Quelle `ingest_mode` (`fixture` / `live`) und `alerts_fetched`.
 
 ---
 

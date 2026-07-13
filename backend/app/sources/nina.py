@@ -64,6 +64,8 @@ class NinaSourceAdapter:
     def __init__(self, http_client: HttpClient | None = None) -> None:
         self.settings = get_settings()
         self._last_fetch = None
+        self._last_ingest_mode: str | None = None
+        self._last_fetch_count: int = 0
         self._http = http_client or HttpClient(
             user_agent=self.settings.nina_user_agent,
             timeout_seconds=self.settings.nina_fetch_timeout_seconds,
@@ -101,9 +103,12 @@ class NinaSourceAdapter:
                         data=item,
                         detail=detail,
                         geometry=geometry,
+                        ingest_mode="fixture",
                     )
                 )
         self._last_fetch = utc_now()
+        self._last_ingest_mode = "fixture"
+        self._last_fetch_count = len(payloads)
         return payloads
 
     def _load_detail_fixture(self, alert_id: str) -> dict[str, Any] | None:
@@ -150,10 +155,13 @@ class NinaSourceAdapter:
                     data=item,
                     detail=detail,
                     geometry=geometry,
+                    ingest_mode="live",
                 )
             )
 
         self._last_fetch = utc_now()
+        self._last_ingest_mode = "live"
+        self._last_fetch_count = len(payloads)
         logger.info("NINA live fetch returned %d alerts", len(payloads))
         return payloads
 
@@ -198,6 +206,7 @@ class NinaSourceAdapter:
         detail = raw.detail or {}
         info_list = detail.get("info", [])
         info = info_list[0] if info_list else {}
+        ingest_mode = raw.ingest_mode or ("fixture" if self._use_fixtures() else "live")
         return ParsedAlert(
             source=self.source_id,
             source_alert_id=raw.data.get("id", detail.get("identifier", "")),
@@ -206,8 +215,14 @@ class NinaSourceAdapter:
                 "detail": detail,
                 "info": info,
                 "geometry": raw.geometry,
+                "ingest_mode": ingest_mode,
             },
-            raw_payload={"compact": raw.data, "detail": detail, "geometry": raw.geometry},
+            raw_payload={
+                "compact": raw.data,
+                "detail": detail,
+                "geometry": raw.geometry,
+                "_ingest_mode": ingest_mode,
+            },
         )
 
     def normalize_alert(self, parsed: ParsedAlert) -> CanonicalAlert:
@@ -237,10 +252,17 @@ class NinaSourceAdapter:
 
         lat, lon = compute_centroid(geometry)
 
+        ingest_mode = parsed.fields.get("ingest_mode", "live")
+        source_url = None
+        if ingest_mode == "live":
+            source_url = (
+                f"{self.settings.nina_base_url.rstrip('/')}/warnings/{parsed.source_alert_id}.json"
+            )
+
         return CanonicalAlert(
             source=AlertSource.NINA,
             source_alert_id=parsed.source_alert_id,
-            source_url=f"{self.settings.nina_base_url.rstrip('/')}/warnings/{parsed.source_alert_id}.json",
+            source_url=source_url,
             title=title,
             description=sanitize_html(info.get("description")),
             instruction=sanitize_html(info.get("instruction")),
@@ -277,12 +299,15 @@ class NinaSourceAdapter:
                     checked_at=now,
                     latency_ms=1,
                     last_success_at=self._last_fetch or now,
+                    ingest_mode="fixture",
+                    alerts_fetched=self._last_fetch_count or None,
                 )
             return SourceHealth(
                 source=self.source_id,
                 is_healthy=False,
                 checked_at=now,
                 error_message="No NINA fixtures found",
+                ingest_mode="fixture",
             )
 
         import time
@@ -290,7 +315,7 @@ class NinaSourceAdapter:
         start = time.monotonic()
         try:
             url = f"{self.settings.nina_base_url.rstrip('/')}/mowas/mapData.json"
-            await self._http.get_json_list(url)
+            items = await self._http.get_json_list(url)
             latency_ms = int((time.monotonic() - start) * 1000)
             return SourceHealth(
                 source=self.source_id,
@@ -298,6 +323,8 @@ class NinaSourceAdapter:
                 checked_at=now,
                 latency_ms=latency_ms,
                 last_success_at=self._last_fetch or now,
+                ingest_mode="live",
+                alerts_fetched=self._last_fetch_count or len(items),
             )
         except (HttpClientError, Exception) as exc:
             latency_ms = int((time.monotonic() - start) * 1000)
@@ -307,4 +334,5 @@ class NinaSourceAdapter:
                 checked_at=now,
                 latency_ms=latency_ms,
                 error_message=str(exc),
+                ingest_mode="live",
             )

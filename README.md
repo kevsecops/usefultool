@@ -184,7 +184,7 @@ cd backend && pytest -v
 | `NINA_USER_AGENT` | `GlobalRiskIntelligence/1.0` | User-Agent für NINA live |
 | `NINA_BASE_URL` | `https://warnung.bund.de/api31` | NINA API base URL |
 | `NINA_USE_FIXTURES` | `false` | NINA-Fixtures erzwingen |
-| `NINA_FALLBACK_TO_FIXTURES` | `true` | Bei Live-Fehler auf NINA-Fixtures zurückfallen |
+| `NINA_FALLBACK_TO_FIXTURES` | `false` | Bei Live-Fehler auf NINA-Fixtures zurückfallen |
 | `GDACS_BASE_URL` | `https://www.gdacs.org` | GDACS API base URL |
 | `GDACS_USE_FIXTURES` | `false` | GDACS-Fixtures erzwingen |
 | `GDACS_FALLBACK_TO_FIXTURES` | `true` | Bei Live-Fehler auf GDACS-Fixtures zurückfallen |
@@ -225,7 +225,19 @@ docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
 
 ## Demo-Modus
 
-`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs.
+`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs. **Docker Compose setzt `DEMO_MODE=true` standardmäßig** für die lokale Demo.
+
+Für **echte Live-Daten** (warnung.bund.de, GDACS, NOAA):
+
+```env
+DEMO_MODE=false
+NINA_FALLBACK_TO_FIXTURES=false
+SOURCES_LIVE=nina,gdacs,noaa
+```
+
+Dann `docker compose up -d --build` und manuell oder per Scheduler ingest ausführen. Demo-Fixture-Alerts werden beim ersten Live-Ingest deaktiviert.
+
+`GET /api/v1/sources` zeigt `ingest_mode` (`fixture` / `live`) und `alerts_fetched` pro Quelle.
 
 ### LLM aktivieren (optional)
 

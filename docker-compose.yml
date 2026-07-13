@@ -30,6 +30,7 @@ services:
       # Compose values override .env (localhost URLs in .env are for non-Docker dev)
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/usefultool
       DEMO_MODE: "true"
+      NINA_FALLBACK_TO_FIXTURES: "false"
       ADMIN_TOKEN: dev-admin-token
       LOG_LEVEL: INFO
       FIXTURES_DIR: /app/fixtures
