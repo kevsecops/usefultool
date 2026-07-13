@@ -10,6 +10,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("LLM_ENABLED", "true")
+os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 os.environ.setdefault(
     "DATABASE_URL",

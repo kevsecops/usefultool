@@ -1,7 +1,7 @@
 # Global Risk Intelligence MVP
 
-> **Status: Phase 4 — Next.js Dashboard**  
-> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**.
+> **Status: Phase 6 — LLM Cross-Alert Analysis**  
+> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**, **LLM-gestütztes Global Risk Briefing**.
 
 ## Produktbeschreibung
 
@@ -54,6 +54,9 @@ docker compose up -d --build
 # Demo-Daten ingestieren (Fixtures, DEMO_MODE=true in Compose)
 docker compose exec backend python -m app.jobs.cli ingest
 # oder: make ingest
+
+# LLM-Briefing generieren (Mock-Provider in Demo)
+docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
 
 # Prüfen
 curl http://localhost:8000/health
@@ -154,11 +157,13 @@ cd backend && pytest -v
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/usefultool` | PostgreSQL Connection String |
 | `DEMO_MODE` | `false` | Fixtures statt Live-APIs |
 | `ADMIN_TOKEN` | — | Token für Admin-Endpunkte (`X-Admin-Token`) |
-| `LLM_ENABLED` | `true` | `false` deaktiviert LLM (Tests/Demo); Architektur: LLM = Kernschicht |
+| `LLM_ENABLED` | `true` | `false` deaktiviert LLM (sofort rule_based) |
 | `LLM_PROVIDER` | `mock` | `mock`, `openai_compat`, `ollama` |
-| `LLM_BASE_URL` | — | OpenAI-kompatibler Endpoint |
+| `LLM_BASE_URL` | — | OpenAI-kompatibler Endpoint (z. B. `https://api.openai.com/v1`) |
 | `LLM_API_KEY` | — | API-Key (nur Backend) |
-| `LLM_MODEL` | `gpt-4o-mini` | Modellname |
+| `LLM_MODEL` | `gpt-4o-mini` | Modellname (z. B. `gpt-4o-mini`, `llama3`) |
+| `LLM_TIMEOUT_SECONDS` | `30` | LLM Request-Timeout |
+| `LLM_MAX_TOKENS` | `2048` | Max. LLM-Antwortlänge |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS-Origin |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Frontend API base URL (browser) |
 | `API_URL` | `http://backend:8000` | Server-side API URL (Docker) |
@@ -174,7 +179,26 @@ Vollständige Liste: [.env.example](.env.example)
 
 ## Demo-Modus
 
-`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs.
+`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs. Der Mock-LLM-Provider liefert deterministische Briefings.
+
+### Ollama (optional, außerhalb Compose)
+
+```bash
+ollama pull llama3 && ollama serve
+```
+
+In `.env`:
+
+```env
+LLM_ENABLED=true
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+LLM_MODEL=llama3
+```
+
+```bash
+docker compose exec backend python -m app.jobs.cli generate-briefing --type llm
+```
 
 ## Dokumentation
 
@@ -197,8 +221,8 @@ Vollständige Liste: [.env.example](.env.example)
 | 2 | Backend, PostgreSQL/PostGIS, Fixtures, Basis-API | ✅ |
 | 3 | Live NOAA source, bounding_box filter | ✅ |
 | 4 | Dashboard (MapLibre GL JS) | ✅ |
-| 5 | Regelbasierte Analyse & Fallback-Briefing | — |
-| 6 | LLM Cross-Alert-Integration | — |
+| 5 | Regelbasierte Analyse & Fallback-Briefing | ✅ |
+| 6 | LLM Cross-Alert-Integration | ✅ |
 | 7 | Production Hardening, Security Review | — |
 
 ## Lizenz

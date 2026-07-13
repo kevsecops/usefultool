@@ -88,12 +88,12 @@ def main() -> None:
 
     sub.add_parser("health", help="Check database and source health")
 
-    briefing_parser = sub.add_parser("generate-briefing", help="Generate rule-based briefing")
+    briefing_parser = sub.add_parser("generate-briefing", help="Generate risk briefing")
     briefing_parser.add_argument(
         "--type",
         choices=["auto", "rule_based", "llm"],
         default="auto",
-        help="Briefing type (auto=rule_based until Phase 6)",
+        help="Briefing type (auto=LLM when LLM_ENABLED, else rule_based)",
     )
 
     args = parser.parse_args()

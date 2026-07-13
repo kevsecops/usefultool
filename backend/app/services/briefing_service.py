@@ -1,4 +1,4 @@
-"""Briefing orchestration: generate and persist rule-based briefings."""
+"""Briefing orchestration: LLM analysis with rule-based fallback."""
 
 from __future__ import annotations
 
@@ -11,10 +11,15 @@ from app.analysis.clustering import clusters_to_bonus_details, detect_hotspots
 from app.analysis.risk_score import compute_global_risk_score
 from app.analysis.rule_briefing import generate_rule_briefing
 from app.analysis.trends import detect_trend_anomalies, global_rolling_avg
+from app.core.config import get_settings
+from app.core.logging import get_logger
+from app.llm.analyzer import LLMAnalysisError, generate_llm_briefing_content
 from app.models.alert import Alert
 from app.models.briefing import Briefing
 from app.normalization.datetime_utils import utc_now
 from app.schemas.common import BriefingType
+
+logger = get_logger(__name__)
 
 
 def generate_briefing(
@@ -22,22 +27,34 @@ def generate_briefing(
     *,
     briefing_type: str = "auto",
 ) -> Briefing:
-    """Generate and persist a briefing. ``auto`` maps to rule_based until Phase 6 LLM."""
-    if briefing_type == "auto":
-        effective_type = BriefingType.RULE_BASED
-    elif briefing_type in (BriefingType.RULE_BASED, BriefingType.LLM):
-        effective_type = briefing_type
-    else:
-        effective_type = BriefingType.RULE_BASED
+    """Generate and persist a briefing.
 
-    # Phase 6: LLM path; for now always rule_based
+    ``auto`` uses LLM when ``LLM_ENABLED=true``, otherwise rule_based.
+    Falls back to rule_based when LLM fails.
+    """
+    settings = get_settings()
+
+    if briefing_type == "auto":
+        use_llm = settings.llm_enabled
+    elif briefing_type == BriefingType.LLM:
+        use_llm = True
+    elif briefing_type == BriefingType.RULE_BASED:
+        use_llm = False
+    else:
+        use_llm = settings.llm_enabled
+
+    if use_llm:
+        try:
+            return _generate_llm_briefing(db)
+        except LLMAnalysisError as exc:
+            logger.warning("LLM briefing failed, falling back to rule_based: %s", exc)
+            return _generate_rule_based_briefing(db)
+
     return _generate_rule_based_briefing(db)
 
 
-def _generate_rule_based_briefing(db: Session) -> Briefing:
-    now = utc_now()
-    alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
-
+def _collect_analysis_context(db: Session, alerts: list[Alert], now):
+    """Shared stats/hotspots/anomalies/risk computation."""
     hotspots = detect_hotspots(alerts)
     cluster_bonuses = clusters_to_bonus_details(hotspots)
     rolling_avg = global_rolling_avg(alerts, now=now)
@@ -48,6 +65,43 @@ def _generate_rule_based_briefing(db: Session) -> Briefing:
         rolling_avg_active=rolling_avg,
     )
     anomalies = detect_trend_anomalies(alerts, now=now)
+    return hotspots, risk, anomalies
+
+
+def _generate_llm_briefing(db: Session) -> Briefing:
+    now = utc_now()
+    alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    hotspots, risk, anomalies = _collect_analysis_context(db, alerts, now)
+
+    content, llm_model = generate_llm_briefing_content(
+        alerts,
+        risk=risk,
+        hotspots=hotspots,
+        anomalies=anomalies,
+        generated_at=now,
+    )
+
+    source_ids = [uuid.UUID(aid) for aid in content["source_alert_ids"]]
+
+    briefing = Briefing(
+        generated_at=now,
+        type=BriefingType.LLM,
+        overall_risk_score=risk.global_score,
+        overall_confidence=content["overall_confidence"],
+        content=content,
+        source_alert_ids=source_ids,
+        llm_model=llm_model,
+    )
+    db.add(briefing)
+    db.flush()
+    db.refresh(briefing)
+    return briefing
+
+
+def _generate_rule_based_briefing(db: Session) -> Briefing:
+    now = utc_now()
+    alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    hotspots, risk, anomalies = _collect_analysis_context(db, alerts, now)
     content = generate_rule_briefing(
         alerts,
         risk=risk,
