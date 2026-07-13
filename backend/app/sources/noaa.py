@@ -1,8 +1,10 @@
-"""NOAA/NWS source adapter (fixture mode in Phase 2)."""
+"""NOAA/NWS source adapter — live HTTP in Phase 3, fixtures in DEMO_MODE."""
 
 from typing import Any
+from urllib.parse import urlparse
 
 from app.core.config import get_settings
+from app.core.http_client import HttpClient, HttpClientError
 from app.core.logging import get_logger
 from app.normalization.category import normalize_event_name
 from app.normalization.datetime_utils import parse_datetime, utc_now
@@ -38,29 +40,104 @@ _STATUS_MAP = {
 }
 
 
+def _noaa_allowed_hosts(base_url: str) -> frozenset[str]:
+    host = urlparse(base_url).hostname
+    return frozenset({host}) if host else frozenset()
+
+
+def extract_noaa_features(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract GeoJSON features from NWS FeatureCollection (features or @graph)."""
+    features = data.get("features")
+    if isinstance(features, list):
+        return [
+            f
+            for f in features
+            if isinstance(f, dict) and (f.get("type") == "Feature" or "properties" in f)
+        ]
+
+    graph = data.get("@graph")
+    if isinstance(graph, list):
+        return [
+            item
+            for item in graph
+            if isinstance(item, dict) and (item.get("type") == "Feature" or "properties" in item)
+        ]
+
+    return []
+
+
+def resolve_source_url(feature: dict[str, Any], props: dict[str, Any]) -> str | None:
+    """Resolve NWS alert URL from feature id or properties @id/id."""
+    for candidate in (feature.get("id"), props.get("@id"), props.get("id")):
+        if isinstance(candidate, str):
+            if candidate.startswith("http"):
+                return candidate
+            if candidate.startswith("urn:"):
+                return f"https://api.weather.gov/alerts/{candidate}"
+    return None
+
+
 class NoaaSourceAdapter:
     source_id = AlertSource.NOAA
 
-    def __init__(self) -> None:
+    def __init__(self, http_client: HttpClient | None = None) -> None:
         self.settings = get_settings()
         self._last_fetch = None
+        self._http = http_client or HttpClient(
+            user_agent=self.settings.noaa_user_agent,
+            timeout_seconds=self.settings.noaa_fetch_timeout_seconds,
+            max_retries=self.settings.noaa_max_retries,
+            max_response_bytes=self.settings.noaa_max_response_bytes,
+            allowed_hosts=_noaa_allowed_hosts(self.settings.noaa_base_url),
+        )
 
-    async def fetch_alerts(self) -> list[RawAlertPayload]:
+    def _use_fixtures(self) -> bool:
+        if self.settings.demo_mode or self.settings.noaa_use_fixtures:
+            return True
+        live_sources = {s.strip().lower() for s in self.settings.sources_live.split(",") if s.strip()}
+        return "noaa" not in live_sources
+
+    async def _fetch_from_fixtures(self) -> list[RawAlertPayload]:
         payloads: list[RawAlertPayload] = []
         for path in list_fixtures("noaa", "alerts_active_*.json"):
             data = load_fixture("noaa", path.name)
-            features = data.get("features", [])
-            for feature in features:
+            for feature in extract_noaa_features(data):
                 payloads.append(RawAlertPayload(source=self.source_id, data=feature))
         self._last_fetch = utc_now()
         return payloads
 
+    async def _fetch_live(self) -> list[RawAlertPayload]:
+        url = f"{self.settings.noaa_base_url.rstrip('/')}/alerts/active"
+        pages = await self._http.get_json_paginated(url)
+        features: list[dict[str, Any]] = []
+        for page in pages:
+            features.extend(extract_noaa_features(page))
+
+        payloads = [RawAlertPayload(source=self.source_id, data=feature) for feature in features]
+        self._last_fetch = utc_now()
+        logger.info("NOAA live fetch returned %d alerts", len(payloads))
+        return payloads
+
+    async def fetch_alerts(self) -> list[RawAlertPayload]:
+        if self._use_fixtures():
+            return await self._fetch_from_fixtures()
+
+        try:
+            return await self._fetch_live()
+        except Exception as exc:
+            if self.settings.noaa_fallback_to_fixtures and list_fixtures("noaa", "alerts_active_*.json"):
+                logger.warning("NOAA live fetch failed (%s), falling back to fixtures", exc)
+                return await self._fetch_from_fixtures()
+            raise
+
     def parse_alert(self, raw: RawAlertPayload) -> ParsedAlert:
         props = raw.data.get("properties", {})
-        source_alert_id = props.get("id", raw.data.get("id", ""))
+        source_alert_id = props.get("id") or raw.data.get("id", "")
+        if isinstance(source_alert_id, str) and source_alert_id.startswith("http"):
+            source_alert_id = source_alert_id.rsplit("/", 1)[-1]
         return ParsedAlert(
             source=self.source_id,
-            source_alert_id=source_alert_id,
+            source_alert_id=str(source_alert_id),
             fields={
                 "properties": props,
                 "geometry": raw.data.get("geometry"),
@@ -88,10 +165,15 @@ class NoaaSourceAdapter:
         area_desc = props.get("areaDesc", "")
         region = area_desc.split(",")[-1].strip() if area_desc else None
 
+        source_url = resolve_source_url(
+            {"id": feature_id, "properties": props},
+            props,
+        )
+
         return CanonicalAlert(
             source=AlertSource.NOAA,
             source_alert_id=parsed.source_alert_id,
-            source_url=feature_id if isinstance(feature_id, str) and feature_id.startswith("http") else None,
+            source_url=source_url,
             title=props.get("headline") or event_name or "NOAA Alert",
             description=sanitize_html(props.get("description")),
             instruction=sanitize_html(props.get("instruction")),
@@ -119,18 +201,43 @@ class NoaaSourceAdapter:
 
     async def health_check(self) -> SourceHealth:
         now = utc_now()
-        fixtures = list_fixtures("noaa", "alerts_active_*.json")
-        if fixtures:
+        if self._use_fixtures():
+            fixtures = list_fixtures("noaa", "alerts_active_*.json")
+            if fixtures:
+                return SourceHealth(
+                    source=self.source_id,
+                    is_healthy=True,
+                    checked_at=now,
+                    latency_ms=1,
+                    last_success_at=self._last_fetch or now,
+                )
+            return SourceHealth(
+                source=self.source_id,
+                is_healthy=False,
+                checked_at=now,
+                error_message="No NOAA fixtures found",
+            )
+
+        import time
+
+        start = time.monotonic()
+        try:
+            url = f"{self.settings.noaa_base_url.rstrip('/')}/alerts/active?area=DC"
+            await self._http.get_json(url)
+            latency_ms = int((time.monotonic() - start) * 1000)
             return SourceHealth(
                 source=self.source_id,
                 is_healthy=True,
                 checked_at=now,
-                latency_ms=1,
+                latency_ms=latency_ms,
                 last_success_at=self._last_fetch or now,
             )
-        return SourceHealth(
-            source=self.source_id,
-            is_healthy=False,
-            checked_at=now,
-            error_message="No NOAA fixtures found",
-        )
+        except (HttpClientError, Exception) as exc:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return SourceHealth(
+                source=self.source_id,
+                is_healthy=False,
+                checked_at=now,
+                latency_ms=latency_ms,
+                error_message=str(exc),
+            )

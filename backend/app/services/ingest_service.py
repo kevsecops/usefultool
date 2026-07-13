@@ -130,12 +130,14 @@ async def run_ingest(
     errors: list[dict] = []
 
     for adapter in adapters:
+        source_fetched = source_created = source_updated = 0
         try:
             raw_alerts = await adapter.fetch_alerts()
             for raw in raw_alerts:
                 parsed = adapter.parse_alert(raw)
                 canonical = adapter.normalize_alert(parsed)
                 fetched += 1
+                source_fetched += 1
                 key = (canonical.source, canonical.source_alert_id)
                 seen_keys.add(key)
 
@@ -148,9 +150,18 @@ async def run_ingest(
                 if existing:
                     if _update_alert(existing, canonical, now):
                         updated += 1
+                        source_updated += 1
                 else:
                     db.add(_canonical_to_model(canonical, now))
                     created += 1
+                    source_created += 1
+            logger.info(
+                "Ingest source=%s fetched=%d created=%d updated=%d",
+                adapter.source_id,
+                source_fetched,
+                source_created,
+                source_updated,
+            )
         except Exception as exc:
             logger.exception("Ingest failed for source %s", adapter.source_id)
             errors.append({"source": adapter.source_id, "error": str(exc)})

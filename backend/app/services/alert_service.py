@@ -2,10 +2,12 @@
 
 from uuid import UUID
 
+from geoalchemy2.functions import ST_Intersects, ST_MakeEnvelope
 from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
 from app.models.alert import Alert
+from app.normalization.bounding_box import BoundingBoxError, parse_bounding_box
 from app.normalization.geometry import wkt_element_to_geojson
 from app.schemas.alert import AlertQueryParams, AlertResponse
 
@@ -45,6 +47,15 @@ def list_alerts(db: Session, params: AlertQueryParams) -> tuple[list[AlertRespon
     if params.issued_before:
         query = query.where(Alert.issued_at <= params.issued_before)
         count_query = count_query.where(Alert.issued_at <= params.issued_before)
+    if params.bounding_box:
+        try:
+            bbox = parse_bounding_box(params.bounding_box)
+        except BoundingBoxError:
+            raise
+        envelope = ST_MakeEnvelope(bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat, 4326)
+        geo_filter = Alert.geometry.isnot(None) & ST_Intersects(Alert.geometry, envelope)
+        query = query.where(geo_filter)
+        count_query = count_query.where(geo_filter)
 
     total = db.scalar(count_query) or 0
     rows = (

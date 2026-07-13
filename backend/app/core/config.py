@@ -23,6 +23,12 @@ class Settings(BaseSettings):
 
     noaa_user_agent: str = "GlobalRiskIntelligence/1.0 (contact@example.com)"
     noaa_base_url: str = "https://api.weather.gov"
+    noaa_fetch_timeout_seconds: float = 30.0
+    noaa_max_response_bytes: int = 50 * 1024 * 1024
+    noaa_max_retries: int = 3
+    noaa_use_fixtures: bool = False
+    noaa_fallback_to_fixtures: bool = True
+    sources_live: str = "noaa"
     nina_base_url: str = "https://warnung.bund.de/api31"
     gdacs_base_url: str = "https://www.gdacs.org"
 

@@ -303,7 +303,7 @@ GlobalRiskIntelligence/1.0 (contact@example.com)
 
 ### Adapter-Strategie
 
-1. `fetch_alerts()`: `GET /alerts/active` (ggf. mehrere State-Queries für Vollständigkeit)
+1. `fetch_alerts()`: `GET /alerts/active` (paginated via `pagination.next` / `Link` header)
 2. `parse_alert()`: GeoJSON Feature → ParsedAlert
 3. `normalize_alert()`:
    - CAP `severity`, `urgency`, `certainty` direkt mappen
@@ -312,24 +312,29 @@ GlobalRiskIntelligence/1.0 (contact@example.com)
    - `country_code` = `US`
 4. `health_check()`: `GET /alerts/active?area=DC` mit UA-Header
 
+Vollständige Mapping-Tabelle: [docs/noaa-mapping.md](noaa-mapping.md)
+
 ### Mapping-Notizen
 
-| Quellfeld | Kanonisch |
-|-----------|-----------|
-| `properties.id` | `source_alert_id` |
-| `properties.event` | `event_type` |
-| `properties.headline` | `title` |
-| `properties.description` | `description` |
-| `properties.instruction` | `instruction` |
-| `properties.severity` | `severity` |
-| `properties.urgency` | `urgency` |
-| `properties.certainty` | `certainty` |
-| `properties.sent` | `issued_at` |
-| `properties.effective` | `effective_at` |
-| `properties.expires` | `expires_at` |
-| `geometry` | `geometry` |
-| `properties.areaDesc` | `location_name` |
-| Feature `id` URL | `source_url` |
+| Quellfeld | Kanonisch | Implementierung |
+|-----------|-----------|-----------------|
+| `properties.id` | `source_alert_id` | `noaa.py:parse_alert()` |
+| `properties.event` | `event_type` | direkt |
+| `properties.event` | `category` | `normalize_event_name()` |
+| `properties.headline` | `title` | mit Fallback |
+| `properties.description` | `description` | `sanitize_html()` |
+| `properties.instruction` | `instruction` | `sanitize_html()` |
+| `properties.severity` | `severity` | `normalize_cap_severity()` |
+| `properties.urgency` | `urgency` | Enum-Map |
+| `properties.certainty` | `certainty` | Enum-Map |
+| `properties.sent` | `issued_at` | `parse_datetime()` |
+| `properties.effective` | `effective_at` | `parse_datetime()` |
+| `properties.expires` | `expires_at` | `parse_datetime()` |
+| `geometry` | `geometry` | GeoJSON direkt |
+| `geometry` | `latitude`, `longitude` | `compute_centroid()` |
+| `properties.areaDesc` | `location_name` | direkt |
+| Feature `id` / `@id` | `source_url` | `resolve_source_url()` |
+| — | `country_code` | `US` |
 
 ### Bekannte Limitierungen
 
