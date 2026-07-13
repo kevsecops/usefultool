@@ -92,7 +92,7 @@ Response containers: `features[]` (GeoJSON) or `@graph[]` (JSON-LD).
 | `DEMO_MODE` | `false` | All sources use fixtures |
 | `NOAA_USE_FIXTURES` | `false` | Force NOAA fixtures even when live |
 | `NOAA_FALLBACK_TO_FIXTURES` | `true` | On live fetch failure, use fixtures if available |
-| `SOURCES_LIVE` | `noaa` | Comma-separated live sources when not in demo mode |
+| `SOURCES_LIVE` | `nina,gdacs,noaa` | Comma-separated live sources when not in demo mode |
 | `NOAA_USER_AGENT` | — | **Required** for live requests |
 | `NOAA_FETCH_TIMEOUT_SECONDS` | `30` | HTTP timeout |
 | `NOAA_MAX_RETRIES` | `3` | Retry count with exponential backoff |

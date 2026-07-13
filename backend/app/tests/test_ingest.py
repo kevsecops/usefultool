@@ -86,3 +86,39 @@ async def test_ingest_deactivates_removed_alerts(db_session) -> None:
     assert run.alerts_deactivated >= 1
     assert orphan.is_active is False
 
+
+@pytest.mark.asyncio
+async def test_ingest_isolates_source_failures(db_session, monkeypatch) -> None:
+    from app.sources.nina import NinaSourceAdapter
+
+    async def failing_fetch(self):
+        raise RuntimeError("NINA unavailable")
+
+    monkeypatch.setattr(NinaSourceAdapter, "fetch_alerts", failing_fetch)
+
+    run = await run_ingest(db_session)
+    db_session.commit()
+
+    assert run.status == "partial"
+    assert any(err["source"] == "nina" for err in run.errors)
+    assert run.alerts_fetched > 0
+
+
+@pytest.mark.asyncio
+async def test_ingest_dedup_by_source_and_id(db_session) -> None:
+    await run_ingest(db_session)
+    db_session.commit()
+
+    count_before = db_session.scalar(select(func.count()).select_from(Alert))
+    run2 = await run_ingest(db_session)
+    db_session.commit()
+    count_after = db_session.scalar(select(func.count()).select_from(Alert))
+
+    assert run2.alerts_created == 0
+    assert count_before == count_after
+
+    sources = db_session.scalars(select(Alert.source).distinct()).all()
+    assert "nina" in sources
+    assert "gdacs" in sources
+    assert "noaa" in sources
+
