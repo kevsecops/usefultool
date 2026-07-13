@@ -80,6 +80,37 @@ def refresh_fixture_datetimes(
     )
 
 
+def refresh_usgs_fixture(
+    data: dict[str, Any],
+    *,
+    now: datetime | None = None,
+    hours_ago: int = 2,
+) -> dict[str, Any]:
+    """Shift USGS millisecond epoch timestamps so fixtures stay recent."""
+    now = now or utc_now()
+    event_time_ms = int((now - timedelta(hours=hours_ago)).timestamp() * 1000)
+    updated_ms = int(now.timestamp() * 1000)
+
+    refreshed = deepcopy(data)
+    metadata = refreshed.get("metadata")
+    if isinstance(metadata, dict):
+        metadata["generated"] = updated_ms
+
+    features = refreshed.get("features")
+    if isinstance(features, list):
+        for idx, feature in enumerate(features):
+            if not isinstance(feature, dict):
+                continue
+            props = feature.get("properties")
+            if not isinstance(props, dict):
+                continue
+            offset_ms = idx * 60_000
+            props["time"] = event_time_ms - offset_ms
+            props["updated"] = updated_ms - offset_ms
+
+    return refreshed
+
+
 def _load_json(path: Path) -> Any:
     with path.open(encoding="utf-8") as f:
         return json.load(f)
@@ -91,7 +122,7 @@ def load_fixture(source: str, filename: str, *, refresh_dates: bool = True) -> A
     if not path.exists():
         raise FileNotFoundError(f"Fixture not found: {path}")
     data = _load_json(path)
-    if refresh_dates:
+    if refresh_dates and source != "usgs":
         data = refresh_fixture_datetimes(data)
     return data
 
@@ -110,6 +141,6 @@ def load_geojson(source: str, filename: str, *, refresh_dates: bool = True) -> d
     if not path.exists():
         raise FileNotFoundError(f"GeoJSON fixture not found: {path}")
     data = _load_json(path)
-    if refresh_dates:
+    if refresh_dates and source != "usgs":
         data = refresh_fixture_datetimes(data)
     return data

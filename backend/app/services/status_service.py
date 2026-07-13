@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.jobs import scheduler as scheduler_module
 from app.models.alert import Alert
 from app.models.ingest_run import IngestRun
+from app.models.observed_event import ObservedEvent
 from app.normalization.datetime_utils import utc_now
 from app.services.alert_active import filter_effectively_active
 from app.services.alert_fixture import extract_ingest_mode, is_fixture_alert
@@ -33,6 +34,18 @@ def _public_active_alerts(db: Session) -> list[Alert]:
     if get_settings().demo_mode:
         return alerts
     return [alert for alert in alerts if not is_fixture_alert(alert)]
+
+
+def _observed_event_counts_by_source(db: Session) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    rows = db.execute(
+        select(ObservedEvent.source, func.count())
+        .where(ObservedEvent.is_active.is_(True))
+        .group_by(ObservedEvent.source)
+    )
+    for source, count in rows:
+        counts[source] = count
+    return counts
 
 
 def _alert_counts_by_source(alerts: list[Alert]) -> dict[str, int]:
@@ -74,6 +87,7 @@ def get_health_status(db: Session) -> dict:
     last_run = _latest_ingest_run(db)
     public_alerts = _public_active_alerts(db)
     alert_counts = _alert_counts_by_source(public_alerts)
+    observed_event_counts = _observed_event_counts_by_source(db)
 
     last_ingest_at = last_run.finished_at if last_run else None
     last_ingest_status = last_run.status if last_run else None
@@ -110,7 +124,9 @@ def get_health_status(db: Session) -> dict:
         "last_ingest_status": last_ingest_status,
         "last_ingest_error": last_ingest_error,
         "alert_counts": alert_counts,
+        "observed_event_counts": observed_event_counts,
         "active_alert_count": len(public_alerts),
+        "active_observed_event_count": sum(observed_event_counts.values()),
     }
 
 
@@ -137,7 +153,8 @@ async def get_admin_status(db: Session) -> dict:
                     health.last_success_at.isoformat() if health.last_success_at else None
                 ),
                 "ingest_mode": health.ingest_mode,
-                "alerts_fetched": health.alerts_fetched,
+                "records_fetched": health.records_fetched,
+                "alerts_fetched": health.records_fetched,
                 "error_message": health.error_message,
             }
         )

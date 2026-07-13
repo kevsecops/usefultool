@@ -4,11 +4,13 @@ from app.sources.base import BaseSourceAdapter
 from app.sources.gdacs import GdacsSourceAdapter
 from app.sources.nina import NinaSourceAdapter
 from app.sources.noaa import NoaaSourceAdapter
+from app.sources.usgs import UsgsSourceAdapter
 
 _ADAPTERS: dict[str, type] = {
     "nina": NinaSourceAdapter,
     "gdacs": GdacsSourceAdapter,
     "noaa": NoaaSourceAdapter,
+    "usgs": UsgsSourceAdapter,
 }
 
 

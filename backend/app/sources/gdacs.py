@@ -53,6 +53,7 @@ def is_current_event(props: dict[str, Any]) -> bool:
 
 class GdacsSourceAdapter:
     source_id = AlertSource.GDACS
+    record_type = "alert"
 
     def __init__(self, http_client: HttpClient | None = None) -> None:
         self.settings = get_settings()

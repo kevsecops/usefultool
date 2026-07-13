@@ -11,6 +11,7 @@ _SOURCE_NAMES = {
     "nina": "NINA/BBK Germany (MoWaS + DWD)",
     "gdacs": "GDACS International",
     "noaa": "NOAA/NWS USA",
+    "usgs": "USGS Earthquakes",
 }
 
 

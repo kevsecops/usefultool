@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     gdacs_use_fixtures: bool = False
     gdacs_fallback_to_fixtures: bool = True
 
+    usgs_user_agent: str = "GlobalRiskIntelligence/1.0 (contact@example.com)"
+    usgs_base_url: str = "https://earthquake.usgs.gov/earthquakes/feed/v1.0"
+    usgs_fetch_timeout_seconds: float = 30.0
+    usgs_max_response_bytes: int = 50 * 1024 * 1024
+    usgs_max_retries: int = 3
+    usgs_use_fixtures: bool = False
+    usgs_fallback_to_fixtures: bool = True
+
     llm_enabled: bool = False
     llm_provider: str = "mock"
     llm_base_url: str = ""

@@ -18,6 +18,9 @@
 | NINA/BBK (MoWaS + DWD) | Deutschland | `https://warnung.bund.de/api31` |
 | GDACS | International (Naturgefahren) | `https://www.gdacs.org/gdacsapi` |
 | NOAA/NWS (full USA) | USA | `https://api.weather.gov/alerts/active` |
+| USGS Earthquakes | Global (observed events) | `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson` |
+
+**Showcase Phase 1:** USGS-Erdbeben werden als `observed_events` ingestiert (separat von `alerts`). API: `GET /api/v1/observed-events`. Siehe [docs/usgs-mapping.md](docs/usgs-mapping.md).
 
 Details: [docs/data-sources.md](docs/data-sources.md)
 

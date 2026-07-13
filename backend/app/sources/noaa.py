@@ -79,6 +79,7 @@ def resolve_source_url(feature: dict[str, Any], props: dict[str, Any]) -> str | 
 
 class NoaaSourceAdapter:
     source_id = AlertSource.NOAA
+    record_type = "alert"
 
     def __init__(self, http_client: HttpClient | None = None) -> None:
         self.settings = get_settings()

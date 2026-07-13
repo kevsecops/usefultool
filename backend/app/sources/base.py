@@ -2,9 +2,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from app.schemas.alert import CanonicalAlert
+from app.schemas.observed_event import CanonicalObservedEvent
+
+RecordTypeLiteral = Literal["alert", "observed_event"]
 
 
 @dataclass
@@ -25,6 +28,14 @@ class ParsedAlert:
 
 
 @dataclass
+class ParsedObservedEvent:
+    source: str
+    source_event_id: str
+    fields: dict[str, Any] = field(default_factory=dict)
+    raw_payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class SourceHealth:
     source: str
     is_healthy: bool
@@ -33,16 +44,30 @@ class SourceHealth:
     last_success_at: datetime | None = None
     error_message: str | None = None
     ingest_mode: str | None = None
+    records_fetched: int | None = None
     alerts_fetched: int | None = None
 
 
 class BaseSourceAdapter(Protocol):
     source_id: str
+    record_type: RecordTypeLiteral
 
+
+class AlertSourceAdapter(BaseSourceAdapter, Protocol):
     async def fetch_alerts(self) -> list[RawAlertPayload]: ...
 
     def parse_alert(self, raw: RawAlertPayload) -> ParsedAlert: ...
 
     def normalize_alert(self, parsed: ParsedAlert) -> CanonicalAlert: ...
+
+    async def health_check(self) -> SourceHealth: ...
+
+
+class ObservedEventSourceAdapter(BaseSourceAdapter, Protocol):
+    async def fetch_alerts(self) -> list[RawAlertPayload]: ...
+
+    def parse_observed_event(self, raw: RawAlertPayload) -> ParsedObservedEvent: ...
+
+    def normalize_observed_event(self, parsed: ParsedObservedEvent) -> CanonicalObservedEvent: ...
 
     async def health_check(self) -> SourceHealth: ...

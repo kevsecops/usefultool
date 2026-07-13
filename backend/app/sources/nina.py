@@ -60,6 +60,7 @@ def extract_geometry_from_geojson(data: dict[str, Any]) -> dict[str, Any] | None
 
 class NinaSourceAdapter:
     source_id = AlertSource.NINA
+    record_type = "alert"
 
     def __init__(self, http_client: HttpClient | None = None) -> None:
         self.settings = get_settings()

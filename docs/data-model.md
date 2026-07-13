@@ -153,6 +153,57 @@ fingerprint = SHA256(
 
 **API-Filter `bounding_box`:** `min_lon,min_lat,max_lon,max_lat` → `ST_Intersects` bzw. BBox-Overlap.
 
+## ObservedEvent (Showcase Phase 1)
+
+Persistierte Beobachtungen aus dedizierten Event-Feeds (z. B. USGS Erdbeben). Separate Pipeline vom Alert-Modell — bestehende `alerts`-API bleibt unverändert.
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|--------------|
+| `id` | UUID | ja | Primärschlüssel |
+| `source` | enum | ja | `usgs` (weitere in späteren Phasen) |
+| `source_event_id` | string | ja | ID in der Quell-API |
+| `source_url` | string | nein | Link zur Originalmeldung |
+| `title` | string | ja | Kurztitel |
+| `description` | text | nein | Generierte Beschreibung |
+| `event_type` | string | nein | z. B. `earthquake` |
+| `category` | enum | ja | Normalisierte Kategorie |
+| `severity` | enum | ja | PAGER/significance-basiert (nicht nur Magnitude) |
+| `status` | enum | ja | `automatic`, `reviewed`, `deleted`, `unknown` |
+| `confidence` | enum | ja | `low`, `medium`, `high` |
+| `country_code` | string(2) | nein | ISO 3166-1 alpha-2 |
+| `region` | string | nein | Region/Bundesland |
+| `location_name` | string | nein | Ortsbeschreibung |
+| `latitude` / `longitude` | float | nein | WGS84 Zentroid |
+| `geometry` | GeoJSON | nein | Point (PostGIS GIST) |
+| `spatial_scope` | enum | ja | Default `local` (für künftige SWPC etc.) |
+| `affected_latitude_min/max` | float | nein | Nullable, für globale Events |
+| `issued_at` | datetime | ja | Ereigniszeit |
+| `starts_at` / `ends_at` | datetime | nein | Gültigkeitsfenster |
+| `updated_at_source` | datetime | nein | Letzte Quelländerung |
+| `ingested_at` / `last_seen_at` | datetime | ja | Ingest-Metadaten |
+| `raw_payload` | JSONB | ja | Unveränderte Quellantwort |
+| `source_metadata` | JSONB | nein | magnitude, PAGER, tsunami, etc. |
+| `fingerprint` | string(64) | ja | Dedup-Key |
+| `is_active` | bool | ja | Noch im aktuellen Feed |
+
+**API:** `GET /api/v1/observed-events`, `GET /api/v1/observed-events/{id}`  
+**Mapping:** [usgs-mapping.md](./usgs-mapping.md)
+
+### SourceStatus (persistent)
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `source` | string (PK) | z. B. `usgs` |
+| `record_type` | string | `alert` oder `observed_event` |
+| `is_healthy` | bool | Letzter Health-Check |
+| `checked_at` | datetime | |
+| `latency_ms` | int | |
+| `last_success_at` | datetime | |
+| `error_message` | text | |
+| `ingest_mode` | string | `live` / `fixture` |
+| `records_fetched` | int | Letzter Ingest-Lauf |
+| `updated_at` | datetime | |
+
 ## Zusätzliche Entitäten (Phase 2+)
 
 ### IngestRun

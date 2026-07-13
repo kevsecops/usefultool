@@ -9,6 +9,33 @@ class AlertSource(StrEnum):
     NOAA = "noaa"
 
 
+class DataSource(StrEnum):
+    """All ingest sources including observed-event feeds."""
+
+    NINA = "nina"
+    GDACS = "gdacs"
+    NOAA = "noaa"
+    USGS = "usgs"
+
+
+class RecordType(StrEnum):
+    ALERT = "alert"
+    OBSERVED_EVENT = "observed_event"
+
+
+class ObservedEventStatus(StrEnum):
+    AUTOMATIC = "automatic"
+    REVIEWED = "reviewed"
+    DELETED = "deleted"
+    UNKNOWN = "unknown"
+
+
+class SpatialScope(StrEnum):
+    LOCAL = "local"
+    REGIONAL = "regional"
+    GLOBAL = "global"
+
+
 class Severity(StrEnum):
     UNKNOWN = "unknown"
     MINOR = "minor"

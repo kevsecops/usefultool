@@ -33,3 +33,21 @@ def generate_fingerprint(
         ]
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def generate_observed_event_fingerprint(
+    source: str,
+    source_event_id: str,
+    title: str,
+    issued_at: datetime,
+    severity: Severity | str,
+    category: Category | str,
+) -> str:
+    return generate_fingerprint(
+        source=source,
+        source_alert_id=source_event_id,
+        title=title,
+        issued_at=issued_at,
+        severity=severity,
+        category=category,
+    )

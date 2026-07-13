@@ -99,4 +99,6 @@ def test_sources(client) -> None:
     response = client.get("/api/v1/sources")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["sources"]) == 3
+    assert len(data["sources"]) == 4
+    source_ids = {s["id"] for s in data["sources"]}
+    assert "usgs" in source_ids
