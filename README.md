@@ -1,7 +1,7 @@
 # Global Risk Intelligence MVP
 
-> **Status: Phase 3 — NOAA live integration**  
-> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter. Frontend folgt in Phase 4.
+> **Status: Phase 4 — Next.js Dashboard**  
+> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**.
 
 ## Produktbeschreibung
 
@@ -48,7 +48,7 @@ Vollständiges Diagramm: [docs/architecture.md](docs/architecture.md)
 # Repository klonen, .env anlegen
 cp .env.example .env
 
-# PostgreSQL + Backend starten
+# PostgreSQL + Backend + Frontend starten
 docker compose up -d
 
 # Migrationen (beim ersten Start automatisch via backend entrypoint)
@@ -68,6 +68,23 @@ curl "http://localhost:8000/api/v1/alerts?bounding_box=-98,32,-96,34&country=US"
 
 - API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+- **Dashboard: http://localhost:3000**
+
+## Frontend (lokal ohne Docker)
+
+```bash
+cd frontend
+npm install
+cp ../.env.example ../.env   # or set NEXT_PUBLIC_API_URL
+npm run dev
+```
+
+Dashboard: http://localhost:3000 (Backend muss auf Port 8000 laufen).
+
+```bash
+# Production build testen
+cd frontend && npm run build && npm start
+```
 
 ## Lokaler Start (ohne Docker)
 
@@ -112,6 +129,8 @@ docker compose exec backend pytest -v
 | `LLM_API_KEY` | — | API-Key (nur Backend) |
 | `LLM_MODEL` | `gpt-4o-mini` | Modellname |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS-Origin |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Frontend API base URL (browser) |
+| `API_URL` | `http://backend:8000` | Server-side API URL (Docker) |
 | `NOAA_USER_AGENT` | `GlobalRiskIntelligence/1.0` | Pflicht-Header für NOAA live |
 | `NOAA_BASE_URL` | `https://api.weather.gov` | NOAA API base URL |
 | `NOAA_FETCH_TIMEOUT_SECONDS` | `30` | HTTP timeout für NOAA |
@@ -146,7 +165,7 @@ Vollständige Liste: [.env.example](.env.example)
 | 1 | Planung & Dokumentation | ✅ |
 | 2 | Backend, PostgreSQL/PostGIS, Fixtures, Basis-API | ✅ |
 | 3 | Live NOAA source, bounding_box filter | ✅ |
-| 4 | Dashboard (MapLibre GL JS) | — |
+| 4 | Dashboard (MapLibre GL JS) | ✅ |
 | 5 | Regelbasierte Analyse & Fallback-Briefing | — |
 | 6 | LLM Cross-Alert-Integration | — |
 | 7 | Production Hardening, Security Review | — |
