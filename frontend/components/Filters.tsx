@@ -3,6 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import type { AlertFilters, AlertSource, Category, Severity } from "@/types/alert";
+import { filtersFromSearchParams } from "@/lib/filters";
+
+export { filtersFromSearchParams };
 
 const SOURCES: { value: AlertSource; label: string }[] = [
   { value: "noaa", label: "NOAA/NWS" },
@@ -180,26 +183,3 @@ export function Filters({ showCountry = true, className = "" }: FiltersProps) {
   );
 }
 
-export function filtersFromSearchParams(
-  searchParams: Record<string, string | string[] | undefined>,
-  defaults: Partial<AlertFilters> = {},
-): AlertFilters {
-  const get = (key: string) => {
-    const v = searchParams[key];
-    return Array.isArray(v) ? v[0] : v;
-  };
-
-  const page = parseInt(get("page") ?? "1", 10);
-  const limit = defaults.limit ?? 20;
-  const offset = defaults.offset ?? (page - 1) * limit;
-
-  return {
-    source: (get("source") as AlertSource) || undefined,
-    country: get("country") || undefined,
-    category: (get("category") as Category) || undefined,
-    severity: (get("severity") as Severity) || undefined,
-    active: get("active") !== "false",
-    limit,
-    offset,
-  };
-}
