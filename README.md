@@ -300,6 +300,7 @@ docker compose exec backend python -m app.jobs.cli generate-briefing --type llm
 | [docs/deployment.md](docs/deployment.md) | Docker Compose Deployment |
 | [docs/n8n-integration.md](docs/n8n-integration.md) | Optionale n8n-Integration |
 | [docs/consistency-audit.md](docs/consistency-audit.md) | Plattform-Konsistenz-Audit |
+| [docs/phase0-assessment.md](docs/phase0-assessment.md) | Phase 0 Repository Assessment (Showcase-Erweiterung) |
 | [docs/llm-analysis.md](docs/llm-analysis.md) | LLM als Kern-Analyseschicht |
 | [docs/risk-scoring.md](docs/risk-scoring.md) | Risk-Score-Algorithmus |
 | [docs/security.md](docs/security.md) | Threat Model & Maßnahmen |
