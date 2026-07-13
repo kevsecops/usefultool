@@ -3,13 +3,15 @@
 from uuid import UUID
 
 from geoalchemy2.functions import ST_Intersects, ST_MakeEnvelope
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, inspect, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.alert import Alert
 from app.normalization.bounding_box import BoundingBoxError, parse_bounding_box
+from app.normalization.datetime_utils import utc_now
 from app.normalization.geometry import wkt_element_to_geojson
 from app.schemas.alert import AlertQueryParams, AlertResponse
+from app.services.alert_active import is_effectively_active
 
 
 def _alert_to_response(alert: Alert, include_raw: bool = False) -> AlertResponse:
@@ -17,6 +19,7 @@ def _alert_to_response(alert: Alert, include_raw: bool = False) -> AlertResponse
     fields = {col.key: getattr(alert, col.key) for col in inspect(alert).mapper.column_attrs}
     fields.pop("geometry", None)
     fields["geometry"] = geometry
+    fields["is_active"] = is_effectively_active(alert)
     if not include_raw:
         fields["raw_payload"] = None
     return AlertResponse.model_validate(fields)
@@ -29,6 +32,11 @@ def list_alerts(db: Session, params: AlertQueryParams) -> tuple[list[AlertRespon
     if params.active is not None:
         query = query.where(Alert.is_active == params.active)
         count_query = count_query.where(Alert.is_active == params.active)
+        if params.active:
+            now = utc_now()
+            not_expired = or_(Alert.expires_at.is_(None), Alert.expires_at >= now)
+            query = query.where(not_expired)
+            count_query = count_query.where(not_expired)
     if params.source:
         query = query.where(Alert.source == params.source)
         count_query = count_query.where(Alert.source == params.source)

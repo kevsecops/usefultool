@@ -151,35 +151,34 @@ def _build_summary(
 
 
 def _affected_regions(alerts: list[Alert], hotspots: list[HotspotCluster]) -> list[dict[str, Any]]:
-    regions: list[dict[str, Any]] = []
-    if hotspots:
-        for h in hotspots[:10]:
-            regions.append(
-                {
-                    "region": h.region,
-                    "alert_count": h.count,
-                    "max_severity": h.max_severity,
-                    "alert_ids": h.alert_ids,
-                }
-            )
-        return regions
+    """Aggregate active alerts by country — consistent with top_countries."""
+    from collections import defaultdict
 
-    from collections import Counter
+    del hotspots  # hotspots used for cross_border_patterns, not region listing
 
-    by_region: Counter[str] = Counter()
-    region_alerts: dict[str, list[Alert]] = {}
+    by_country: dict[str, list[Alert]] = defaultdict(list)
     for alert in alerts:
-        label = _region_label(alert)
-        by_region[label] += 1
-        region_alerts.setdefault(label, []).append(alert)
+        if alert.country_code:
+            by_country[alert.country_code].append(alert)
 
-    for region, count in by_region.most_common(10):
-        group = region_alerts[region]
+    regions: list[dict[str, Any]] = []
+    sorted_countries = sorted(
+        by_country.items(),
+        key=lambda item: (
+            -len(item[1]),
+            -max(SEVERITY_RANK.get(a.severity, 0) for a in item[1]),
+            item[0],
+        ),
+    )
+    for code, group in sorted_countries[:10]:
+        country_name = next((a.country_name for a in group if a.country_name), None)
+        region_label = f"{country_name} ({code})" if country_name else code
         max_sev = max(group, key=lambda a: SEVERITY_RANK.get(a.severity, 0)).severity
         regions.append(
             {
-                "region": region,
-                "alert_count": count,
+                "region": region_label,
+                "country_code": code,
+                "alert_count": len(group),
                 "max_severity": max_sev,
                 "alert_ids": [str(a.id) for a in group],
             }

@@ -183,3 +183,161 @@ def test_briefing_implications_wildfire_uses_schema_domains() -> None:
     }
     assert len(implications["logistics"]) > 0
     assert any("Luftqualität" in s for s in implications["infrastructure"])
+
+
+def test_affected_regions_lists_all_countries() -> None:
+    """affected_regions must list every country with active alerts, not only hotspot clusters."""
+    alerts = [
+        _make_alert(
+            source="nina",
+            source_alert_id="de-1",
+            fingerprint="fp-de-1",
+            country_code="DE",
+            country_name="Germany",
+            region="Saarland",
+            severity="moderate",
+        ),
+        _make_alert(
+            source="nina",
+            source_alert_id="de-2",
+            fingerprint="fp-de-2",
+            country_code="DE",
+            country_name="Germany",
+            region="Bayern",
+            severity="moderate",
+        ),
+        _make_alert(
+            source="nina",
+            source_alert_id="de-3",
+            fingerprint="fp-de-3",
+            country_code="DE",
+            country_name="Germany",
+            region="Köln",
+            severity="moderate",
+        ),
+        _make_alert(
+            source="nina",
+            source_alert_id="de-4",
+            fingerprint="fp-de-4",
+            country_code="DE",
+            country_name="Germany",
+            region="BW",
+            severity="severe",
+        ),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="pg-1",
+            fingerprint="fp-pg",
+            country_code="PG",
+            country_name="Papua New Guinea",
+            category="earthquake",
+            severity="moderate",
+        ),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="hn-1",
+            fingerprint="fp-hn",
+            country_code="HN",
+            country_name="Honduras",
+            category="weather",
+            severity="severe",
+        ),
+        _make_alert(
+            source="noaa",
+            source_alert_id="us-1",
+            fingerprint="fp-us-1",
+            country_code="US",
+            country_name="United States",
+            region="Texas",
+            severity="minor",
+        ),
+        _make_alert(
+            source="noaa",
+            source_alert_id="us-2",
+            fingerprint="fp-us-2",
+            country_code="US",
+            country_name="United States",
+            region="California",
+            severity="severe",
+        ),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="id-1",
+            fingerprint="fp-id",
+            country_code="ID",
+            country_name="Indonesia",
+            category="volcano",
+            severity="minor",
+        ),
+    ]
+    hotspots = detect_hotspots(alerts)
+
+    risk = compute_global_risk_score(alerts, cluster_bonuses=[], rolling_avg_active=len(alerts))
+    briefing = generate_rule_briefing(alerts, risk=risk, hotspots=hotspots)
+
+    region_codes = {item.get("country_code") for item in briefing["affected_regions"]}
+    top_codes = {item["code"] for item in briefing["top_countries"]}
+    assert region_codes == top_codes
+    assert region_codes == {"DE", "US", "PG", "HN", "ID"}
+
+    de_region = next(item for item in briefing["affected_regions"] if item["country_code"] == "DE")
+    assert de_region["alert_count"] == 4
+    us_region = next(item for item in briefing["affected_regions"] if item["country_code"] == "US")
+    assert us_region["alert_count"] == 2
+
+
+def test_briefing_internal_consistency_mixed_sources() -> None:
+    """top_countries, by_source, and affected_regions must agree on the same snapshot."""
+    alerts = [
+        _make_alert(source="nina", source_alert_id="n1", fingerprint="fp-n1", country_code="DE"),
+        _make_alert(source="nina", source_alert_id="n2", fingerprint="fp-n2", country_code="DE"),
+        _make_alert(source="nina", source_alert_id="n3", fingerprint="fp-n3", country_code="DE"),
+        _make_alert(source="nina", source_alert_id="n4", fingerprint="fp-n4", country_code="DE"),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="g1",
+            fingerprint="fp-g1",
+            country_code="PG",
+            severity="moderate",
+        ),
+        _make_alert(
+            source="noaa",
+            source_alert_id="o1",
+            fingerprint="fp-o1",
+            country_code="US",
+            severity="severe",
+        ),
+        _make_alert(
+            source="noaa",
+            source_alert_id="o2",
+            fingerprint="fp-o2",
+            country_code="US",
+            severity="minor",
+        ),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="g2",
+            fingerprint="fp-g2",
+            country_code="HN",
+            severity="severe",
+        ),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="g3",
+            fingerprint="fp-g3",
+            country_code="ID",
+            severity="minor",
+        ),
+    ]
+    hotspots = detect_hotspots(alerts)
+    risk = compute_global_risk_score(alerts, cluster_bonuses=[], rolling_avg_active=len(alerts))
+    briefing = generate_rule_briefing(alerts, risk=risk, hotspots=hotspots)
+
+    assert briefing["active_count"] == len(alerts)
+    assert sum(item["count"] for item in briefing["by_source"]) == briefing["active_count"]
+    assert sum(item["count"] for item in briefing["top_countries"]) == briefing["active_count"]
+    assert sum(item["alert_count"] for item in briefing["affected_regions"]) == briefing["active_count"]
+
+    country_counts = {item["code"]: item["count"] for item in briefing["top_countries"]}
+    region_counts = {item["country_code"]: item["alert_count"] for item in briefing["affected_regions"]}
+    assert country_counts == region_counts

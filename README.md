@@ -51,15 +51,18 @@ cp .env.example .env
 docker compose up -d --build
 # oder: make up   bzw.   ./scripts/docker-up.sh
 
-# Demo-Daten ingestieren (Fixtures, DEMO_MODE=true in Compose)
-docker compose exec backend python -m app.jobs.cli ingest
-
-# Regelbasiertes Briefing (LLM_ENABLED=false by default)
-docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
-
-# Prüfen
+# Prüfen (Ingest + Briefing starten automatisch nach ~30s)
 curl http://localhost:8000/health
 curl http://localhost:3000
+```
+
+Der Backend-Scheduler führt **automatisch** alle 15 Minuten Ingest aus und erzeugt danach ein Briefing (`SCHEDULER_ENABLED=true`, `AUTO_GENERATE_BRIEFING=true` in `docker-compose.yml`). Kein manuelles `python -m app.jobs.cli ingest` nötig.
+
+**Debugging (optional):**
+
+```bash
+docker compose exec backend python -m app.jobs.cli ingest
+docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
 ```
 
 | Dienst | URL |

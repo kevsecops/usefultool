@@ -41,10 +41,12 @@ services:
       NINA_USER_AGENT: "GlobalRiskIntelligence/1.0 (contact@example.com)"
       NINA_BASE_URL: "https://warnung.bund.de/api31"
       GDACS_BASE_URL: "https://www.gdacs.org"
-      # Optional background ingest (set true for automatic refresh in container)
-      SCHEDULER_ENABLED: "false"
+      # Automatic background ingest + briefing (no manual CLI needed)
+      SCHEDULER_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "15"
       SCHEDULER_GENERATE_BRIEFING: "true"
+      AUTO_GENERATE_BRIEFING: "true"
+      SCHEDULER_STARTUP_DELAY_SECONDS: "30"
     volumes:
       - ./fixtures:/app/fixtures:ro
     depends_on:

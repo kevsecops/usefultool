@@ -1,5 +1,7 @@
 """Ingest service tests."""
 
+from datetime import timedelta
+
 import pytest
 from sqlalchemy import func, select
 
@@ -164,4 +166,58 @@ async def test_ingest_dedup_by_source_and_id(db_session) -> None:
     assert "nina" in sources
     assert "gdacs" in sources
     assert "noaa" in sources
+
+
+@pytest.mark.asyncio
+async def test_ingest_deactivates_expired_alerts(db_session) -> None:
+    """Alerts past expires_at must be marked inactive during ingest."""
+    now = utc_now()
+    expired = Alert(
+        source="nina",
+        source_alert_id="expired-january-flood",
+        title="Hochwasserwarnung Saarland",
+        category="flood",
+        severity="moderate",
+        status="actual",
+        country_code="DE",
+        issued_at=now,
+        expires_at=now - timedelta(hours=6),
+        ingested_at=now,
+        last_seen_at=now,
+        raw_payload={"test": True},
+        fingerprint=generate_fingerprint(
+            source="nina",
+            source_alert_id="expired-january-flood",
+            title="Hochwasserwarnung Saarland",
+            issued_at=now,
+            severity="moderate",
+            category="flood",
+        ),
+        is_active=True,
+    )
+    db_session.add(expired)
+    db_session.commit()
+
+    run = await run_ingest(db_session)
+    db_session.commit()
+    db_session.refresh(expired)
+
+    assert run.alerts_deactivated >= 1
+    assert expired.is_active is False
+
+
+@pytest.mark.asyncio
+async def test_fixture_dates_refreshed_on_ingest(db_session) -> None:
+    """January NINA fixture must get future expires_at when loaded via fixture_loader."""
+    now = utc_now()
+    await run_ingest(db_session, sources=["nina"])
+    db_session.commit()
+
+    alert = db_session.scalar(
+        select(Alert).where(Alert.source_alert_id.like("%20260113%")).limit(1)
+    )
+    assert alert is not None
+    assert alert.expires_at is not None
+    assert alert.expires_at > now
+    assert alert.is_active is True
 

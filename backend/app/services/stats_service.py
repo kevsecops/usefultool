@@ -12,11 +12,13 @@ from app.models.alert import Alert
 from app.models.ingest_run import IngestRun
 from app.normalization.datetime_utils import utc_now
 from app.schemas.stats import CountryCount, HotspotRegion, StatsResponse, TrendAnomalyItem
+from app.services.alert_active import filter_effectively_active
 
 
 def get_stats(db: Session) -> StatsResponse:
-    active_alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
     now = utc_now()
+    db_alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    active_alerts = filter_effectively_active(db_alerts, now=now)
 
     by_country: Counter[str] = Counter()
     by_category: Counter[str] = Counter()
