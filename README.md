@@ -1,7 +1,7 @@
 # Global Risk Intelligence MVP
 
-> **Status: Phase 4 — Next.js Dashboard**  
-> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**.
+> **Status: Phase 6 — LLM Cross-Alert Analysis**  
+> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**, **LLM-gestütztes Global Risk Briefing**.
 
 ## Produktbeschreibung
 
@@ -42,56 +42,83 @@ Vollständiges Diagramm: [docs/architecture.md](docs/architecture.md)
 | LLM | OpenAI-kompatibel (Prod), Mock (Demo) — **Kern-Analyseschicht** |
 | Deployment | Docker Compose |
 
-## Schnellstart (Docker)
+## Schnellstart (Docker — empfohlen)
+
+**Voraussetzungen:** [Docker](https://docs.docker.com/get-docker/) und Docker Compose (kein lokales Node/Python nötig).
 
 ```bash
-# Repository klonen, .env anlegen
 cp .env.example .env
+docker compose up -d --build
+# oder: make up   bzw.   ./scripts/docker-up.sh
 
-# PostgreSQL + Backend + Frontend starten
-docker compose up -d
-
-# Migrationen (beim ersten Start automatisch via backend entrypoint)
-docker compose exec backend alembic upgrade head
-
-# Demo-Daten ingestieren
+# Demo-Daten ingestieren (Fixtures, DEMO_MODE=true in Compose)
 docker compose exec backend python -m app.jobs.cli ingest
+# oder: make ingest
 
-# Live NOAA ingest (set NOAA_USER_AGENT in .env first)
+# LLM-Briefing generieren (Mock-Provider in Demo)
+docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
+
+# Prüfen
+curl http://localhost:8000/health
+curl http://localhost:3000
+```
+
+| Dienst | URL |
+|--------|-----|
+| **Dashboard** | http://localhost:3000 |
+| API | http://localhost:8000 |
+| API Docs | http://localhost:8000/docs |
+
+Migrationen laufen beim Backend-Start automatisch (`docker-entrypoint.sh`). Postgres, Backend und Frontend haben Healthchecks; das Frontend startet erst, wenn die API healthy ist.
+
+**Nach Code-Änderungen:** `docker compose up -d --build` oder `make rebuild` (vollständiger No-Cache-Rebuild).
+
+**Logs:** `docker compose logs -f frontend backend` oder `make logs`.
+
+**API-URLs in Containern:** Der Browser nutzt `NEXT_PUBLIC_API_URL=http://localhost:8000`. Server Components und SSR im Next.js-Container nutzen `API_URL=http://backend:8000` (siehe `frontend/lib/api.ts`).
+
+```bash
+# Live NOAA ingest (.env: NOAA_USER_AGENT setzen; DEMO_MODE in Compose auf false setzen oder exec überschreiben)
 DEMO_MODE=false docker compose exec backend python -m app.jobs.cli ingest --sources noaa
 
-# API testen
-curl http://localhost:8000/health
 curl http://localhost:8000/api/v1/alerts
 curl "http://localhost:8000/api/v1/alerts?bounding_box=-98,32,-96,34&country=US"
 ```
 
-- API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- **Dashboard: http://localhost:3000**
+### Makefile-Hilfen
 
-## Frontend (lokal ohne Docker)
+| Target | Aktion |
+|--------|--------|
+| `make up` | `.env` anlegen falls fehlend, `docker compose up -d --build` |
+| `make ingest` | Demo-Fixture-Ingest im Backend-Container |
+| `make logs` | Frontend- und Backend-Logs folgen |
+| `make rebuild` | `down`, `build --no-cache`, `up -d` |
+| `make health` | Kurztest API + Frontend |
+| `make test-backend` | `pytest` im Backend-Container |
+
+## Entwicklung ohne Docker
+
+### Frontend (npm)
 
 ```bash
 cd frontend
 npm install
-cp ../.env.example ../.env   # or set NEXT_PUBLIC_API_URL
+cp ../.env.example ../.env   # NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 
 Dashboard: http://localhost:3000 (Backend muss auf Port 8000 laufen).
 
+Production-Build lokal (standalone — nicht `next start` verwenden):
+
 ```bash
-# Production build testen (standalone — nicht `next start` verwenden)
 cd frontend
 rm -rf .next
 npm run build
-npm run start
+npm run start   # node .next/standalone/server.js
 ```
 
-`npm run start` startet `node .next/standalone/server.js` (erforderlich wegen `output: "standalone"` in `next.config.ts`). Dev nutzt Turbopack (`npm run dev`); Prod-Build immer nach `rm -rf .next` bauen, falls zuvor `npm run dev` lief — vermischte Artefakte verursachen sonst Runtime-Fehler.
-
-## Lokaler Start (ohne Docker)
+### Backend + DB (venv)
 
 ```bash
 # PostgreSQL muss laufen (z. B. nur DB-Container)
@@ -114,11 +141,13 @@ DEMO_MODE=false SOURCES_LIVE=noaa python -m app.jobs.cli ingest --sources noaa
 ## Tests
 
 ```bash
-# Mit laufender PostgreSQL-Instanz
-cd backend && pytest -v
+# Empfohlen: voller Stack in Docker, dann Tests im Backend-Container
+docker compose up -d
+make test-backend
+# bzw. docker compose exec backend pytest -v
 
-# Oder im Container
-docker compose exec backend pytest -v
+# Nur mit lokaler PostgreSQL-Instanz
+cd backend && pytest -v
 ```
 
 ## Environment-Variablen
@@ -128,11 +157,13 @@ docker compose exec backend pytest -v
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/usefultool` | PostgreSQL Connection String |
 | `DEMO_MODE` | `false` | Fixtures statt Live-APIs |
 | `ADMIN_TOKEN` | — | Token für Admin-Endpunkte (`X-Admin-Token`) |
-| `LLM_ENABLED` | `true` | `false` deaktiviert LLM (Tests/Demo); Architektur: LLM = Kernschicht |
+| `LLM_ENABLED` | `true` | `false` deaktiviert LLM (sofort rule_based) |
 | `LLM_PROVIDER` | `mock` | `mock`, `openai_compat`, `ollama` |
-| `LLM_BASE_URL` | — | OpenAI-kompatibler Endpoint |
+| `LLM_BASE_URL` | — | OpenAI-kompatibler Endpoint (z. B. `https://api.openai.com/v1`) |
 | `LLM_API_KEY` | — | API-Key (nur Backend) |
-| `LLM_MODEL` | `gpt-4o-mini` | Modellname |
+| `LLM_MODEL` | `gpt-4o-mini` | Modellname (z. B. `gpt-4o-mini`, `llama3`) |
+| `LLM_TIMEOUT_SECONDS` | `30` | LLM Request-Timeout |
+| `LLM_MAX_TOKENS` | `2048` | Max. LLM-Antwortlänge |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS-Origin |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Frontend API base URL (browser) |
 | `API_URL` | `http://backend:8000` | Server-side API URL (Docker) |
@@ -148,7 +179,26 @@ Vollständige Liste: [.env.example](.env.example)
 
 ## Demo-Modus
 
-`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs.
+`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs. Der Mock-LLM-Provider liefert deterministische Briefings.
+
+### Ollama (optional, außerhalb Compose)
+
+```bash
+ollama pull llama3 && ollama serve
+```
+
+In `.env`:
+
+```env
+LLM_ENABLED=true
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+LLM_MODEL=llama3
+```
+
+```bash
+docker compose exec backend python -m app.jobs.cli generate-briefing --type llm
+```
 
 ## Dokumentation
 
@@ -171,8 +221,8 @@ Vollständige Liste: [.env.example](.env.example)
 | 2 | Backend, PostgreSQL/PostGIS, Fixtures, Basis-API | ✅ |
 | 3 | Live NOAA source, bounding_box filter | ✅ |
 | 4 | Dashboard (MapLibre GL JS) | ✅ |
-| 5 | Regelbasierte Analyse & Fallback-Briefing | — |
-| 6 | LLM Cross-Alert-Integration | — |
+| 5 | Regelbasierte Analyse & Fallback-Briefing | ✅ |
+| 6 | LLM Cross-Alert-Integration | ✅ |
 | 7 | Production Hardening, Security Review | — |
 
 ## Lizenz

@@ -29,6 +29,9 @@ services:
       LOG_LEVEL: INFO
       FIXTURES_DIR: /app/fixtures
       FRONTEND_URL: http://localhost:3000
+      LLM_ENABLED: "true"
+      LLM_PROVIDER: mock
+      LLM_MODEL: gpt-4o-mini
     volumes:
       - ./fixtures:/app/fixtures:ro
     depends_on:

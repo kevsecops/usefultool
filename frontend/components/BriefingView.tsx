@@ -34,16 +34,31 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
 
   const content = briefing.content;
 
+  const isLlm = briefing.type === "llm";
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-slate-500">
-              {briefing.type === "rule_based" ? "Regelbasiertes Briefing" : "LLM-Briefing"}
-              {" · "}
-              Vertrauen: {CONFIDENCE_LABELS[briefing.overall_confidence] ?? briefing.overall_confidence}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  isLlm
+                    ? "bg-violet-100 text-violet-800"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                {isLlm ? "LLM-Analyse" : "Regelbasiert"}
+              </span>
+              <span className="text-sm text-slate-500">
+                Vertrauen:{" "}
+                {CONFIDENCE_LABELS[briefing.overall_confidence] ?? briefing.overall_confidence}
+              </span>
+              {briefing.llm_model && (
+                <span className="text-xs text-slate-400">({briefing.llm_model})</span>
+              )}
+            </div>
             <p className="mt-2 text-lg text-slate-800">{content.summary}</p>
           </div>
           <div className="text-right text-sm text-slate-500">
@@ -112,14 +127,31 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
 
       {content.cross_border_patterns.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 font-semibold text-slate-900">Muster (Beobachtungen)</h3>
-          <ul className="space-y-2">
+          <h3 className="mb-3 font-semibold text-slate-900">
+            {isLlm ? "Cross-Alert-Muster" : "Muster (Beobachtungen)"}
+          </h3>
+          <ul className="space-y-3">
             {content.cross_border_patterns.map((p, i) => (
               <li key={i} className="text-sm text-slate-700">
-                {p.description}
-                <span className="ml-2 text-xs text-slate-400">
-                  ({p.confidence})
-                </span>
+                <p>{p.description}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Typ: {p.type} · Vertrauen: {p.confidence}
+                  {p.alert_ids.length > 0 && (
+                    <>
+                      {" · "}
+                      Quellen:{" "}
+                      {p.alert_ids.slice(0, 3).map((id, j) => (
+                        <span key={id}>
+                          {j > 0 && ", "}
+                          <Link href={`/alerts/${id}`} className="text-blue-600 hover:underline">
+                            {id.slice(0, 8)}…
+                          </Link>
+                        </span>
+                      ))}
+                      {p.alert_ids.length > 3 && ` (+${p.alert_ids.length - 3})`}
+                    </>
+                  )}
+                </p>
               </li>
             ))}
           </ul>
@@ -155,10 +187,36 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
         </section>
       )}
 
+      {content.source_alert_ids.length > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="mb-2 font-semibold text-slate-900">Quell-Warnungen</h3>
+          <p className="mb-2 text-xs text-slate-500">
+            {content.source_alert_ids.length} Warnung(en) als Datenbasis für dieses Briefing.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {content.source_alert_ids.slice(0, 12).map((id) => (
+              <Link
+                key={id}
+                href={`/alerts/${id}`}
+                className="rounded bg-slate-100 px-2 py-1 text-xs text-blue-700 hover:bg-slate-200"
+              >
+                {id.slice(0, 8)}…
+              </Link>
+            ))}
+            {content.source_alert_ids.length > 12 && (
+              <span className="px-2 py-1 text-xs text-slate-400">
+                +{content.source_alert_ids.length - 12} weitere
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
       <div className="rounded-lg border border-slate-200 bg-slate-100 p-4 text-sm text-slate-600">
-        <strong>Disclaimer:</strong> Regelbasierte Zusammenfassung aus öffentlichen
-        Warnmeldungen — keine amtlichen Bewertungen. Implikationen sind konservative
-        Hypothesen, keine Prognosen.
+        <strong>Disclaimer:</strong>{" "}
+        {isLlm
+          ? "KI-generierte Interpretation aus öffentlichen Warnmeldungen — keine amtliche Warnung. Muster sind Beobachtungen, keine Kausalitätsnachweise. Implikationen sind Hypothesen, keine Prognosen."
+          : "Regelbasierte Zusammenfassung aus öffentlichen Warnmeldungen — keine amtlichen Bewertungen. Implikationen sind konservative Hypothesen, keine Prognosen."}
       </div>
     </div>
   );
