@@ -105,6 +105,49 @@ async def test_ingest_isolates_source_failures(db_session, monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_ingest_auto_generates_briefing(db_session, monkeypatch) -> None:
+    """Default ingest should create a briefing snapshot aligned with live alerts."""
+    from app.models.briefing import Briefing
+    from app.services.briefing_service import get_latest_briefing
+    from sqlalchemy import func, select
+
+    monkeypatch.setenv("AUTO_GENERATE_BRIEFING", "true")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    run = await run_ingest(db_session)
+    db_session.commit()
+
+    assert run.status in ("success", "partial")
+    count = db_session.scalar(select(func.count()).select_from(Briefing))
+    assert count == 1
+
+    briefing = get_latest_briefing(db_session)
+    assert briefing is not None
+    assert briefing.overall_risk_score == briefing.content["overall_risk_score"]
+    assert briefing.content["active_count"] > 0
+    assert len(briefing.content["by_source"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_ingest_skips_briefing_when_disabled(db_session, monkeypatch) -> None:
+    from app.models.briefing import Briefing
+    from sqlalchemy import func, select
+
+    monkeypatch.setenv("AUTO_GENERATE_BRIEFING", "false")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    await run_ingest(db_session)
+    db_session.commit()
+
+    count = db_session.scalar(select(func.count()).select_from(Briefing))
+    assert count == 0
+
+
+@pytest.mark.asyncio
 async def test_ingest_dedup_by_source_and_id(db_session) -> None:
     await run_ingest(db_session)
     db_session.commit()

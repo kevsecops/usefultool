@@ -51,6 +51,7 @@ export interface PotentialImplications {
 export interface BriefingContent {
   generated_at: string;
   type: "rule_based" | "llm";
+  active_count: number;
   overall_risk_score: number;
   summary: string;
   overall_confidence: "low" | "medium" | "high";

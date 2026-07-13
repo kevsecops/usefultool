@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.alert import Alert
 from app.models.ingest_run import IngestRun
@@ -113,8 +114,14 @@ async def run_ingest(
     db: Session,
     sources: list[str] | None = None,
     *,
-    generate_briefing: bool = False,
+    generate_briefing: bool | None = None,
 ) -> IngestRun:
+    settings = get_settings()
+    should_generate_briefing = (
+        generate_briefing
+        if generate_briefing is not None
+        else settings.auto_generate_briefing
+    )
     now = utc_now()
     source_label = "all" if not sources else ",".join(sources)
     run = IngestRun(
@@ -186,7 +193,7 @@ async def run_ingest(
     db.flush()
     db.refresh(run)
 
-    if generate_briefing and run.status in (IngestRunStatus.SUCCESS, IngestRunStatus.PARTIAL):
+    if should_generate_briefing and run.status in (IngestRunStatus.SUCCESS, IngestRunStatus.PARTIAL):
         from app.services.briefing_service import generate_briefing as gen_briefing
 
         gen_briefing(db, briefing_type="auto")

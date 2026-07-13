@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class IngestRequest(BaseModel):
     sources: list[str] | None = None
     force: bool = False
-    generate_briefing: bool = False
+    generate_briefing: bool | None = None
 
 
 class IngestResponse(BaseModel):

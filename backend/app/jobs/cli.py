@@ -17,12 +17,21 @@ setup_logging()
 logger = get_logger(__name__)
 
 
-async def cmd_ingest(sources: list[str] | None) -> int:
+async def cmd_ingest(sources: list[str] | None, generate_briefing: bool | None) -> int:
     settings = get_settings()
-    logger.info("Starting ingest (demo_mode=%s)", settings.demo_mode)
+    should_generate = (
+        generate_briefing
+        if generate_briefing is not None
+        else settings.auto_generate_briefing
+    )
+    logger.info(
+        "Starting ingest (demo_mode=%s, generate_briefing=%s)",
+        settings.demo_mode,
+        should_generate,
+    )
     db = SessionLocal()
     try:
-        run = await run_ingest(db, sources=sources)
+        run = await run_ingest(db, sources=sources, generate_briefing=should_generate)
         db.commit()
         logger.info(
             "Ingest complete: status=%s fetched=%d created=%d updated=%d deactivated=%d",
@@ -35,6 +44,11 @@ async def cmd_ingest(sources: list[str] | None) -> int:
         if run.errors:
             for err in run.errors:
                 logger.error("Source error: %s", err)
+        if not should_generate and run.status in ("success", "partial"):
+            logger.info(
+                "Briefing not regenerated. Run "
+                "`python -m app.jobs.cli generate-briefing` or set AUTO_GENERATE_BRIEFING=true."
+            )
         return 0 if run.status in ("success", "partial") else 1
     finally:
         db.close()
@@ -85,6 +99,17 @@ def main() -> None:
 
     ingest_parser = sub.add_parser("ingest", help="Run alert ingest")
     ingest_parser.add_argument("--sources", nargs="*", help="Limit to specific sources")
+    ingest_parser.add_argument(
+        "--generate-briefing",
+        action="store_true",
+        default=None,
+        help="Generate briefing after ingest (default: AUTO_GENERATE_BRIEFING env)",
+    )
+    ingest_parser.add_argument(
+        "--no-generate-briefing",
+        action="store_true",
+        help="Skip briefing generation after ingest",
+    )
 
     sub.add_parser("health", help="Check database and source health")
 
@@ -98,7 +123,12 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.command == "ingest":
-        code = asyncio.run(cmd_ingest(args.sources))
+        gen_flag: bool | None = None
+        if args.generate_briefing:
+            gen_flag = True
+        elif args.no_generate_briefing:
+            gen_flag = False
+        code = asyncio.run(cmd_ingest(args.sources, gen_flag))
     elif args.command == "health":
         code = asyncio.run(cmd_health())
     elif args.command == "generate-briefing":

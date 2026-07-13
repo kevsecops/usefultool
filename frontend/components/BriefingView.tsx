@@ -14,6 +14,20 @@ const CONFIDENCE_LABELS: Record<string, string> = {
   high: "Hoch",
 };
 
+function isBriefingStale(briefing: Briefing, stats: Stats): boolean {
+  if (!stats.last_ingest) return false;
+  return new Date(briefing.generated_at) < new Date(stats.last_ingest);
+}
+
+function snapshotActiveCount(content: Briefing["content"]): number {
+  if (content.active_count > 0) return content.active_count;
+  return content.source_alert_ids.length;
+}
+
+function snapshotRiskScore(briefing: Briefing): number {
+  return briefing.content.overall_risk_score ?? briefing.overall_risk_score;
+}
+
 export function BriefingView({ briefing, stats }: BriefingViewProps) {
   if (!briefing) {
     return (
@@ -22,7 +36,7 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
           <h2 className="font-semibold text-amber-900">Kein Briefing verfügbar</h2>
           <p className="mt-1 text-sm text-amber-800">
             Es wurde noch kein Briefing generiert. Führen Sie einen Ingest mit{" "}
-            <code className="rounded bg-amber-100 px-1">generate_briefing: true</code>{" "}
+            <code className="rounded bg-amber-100 px-1">--generate-briefing</code>{" "}
             aus oder nutzen Sie{" "}
             <code className="rounded bg-amber-100 px-1">python -m app.jobs.cli generate-briefing</code>.
           </p>
@@ -33,11 +47,41 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
   }
 
   const content = briefing.content;
-
   const isLlm = briefing.type === "llm";
+  const stale = isBriefingStale(briefing, stats);
+  const activeCount = snapshotActiveCount(content);
+  const riskScore = snapshotRiskScore(briefing);
+  const sourceCount = content.by_source?.length ?? 0;
 
   return (
     <div className="space-y-6">
+      {stale && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <h2 className="font-semibold text-amber-900">
+            Briefing veraltet — bitte neu generieren
+          </h2>
+          <p className="mt-1 text-sm text-amber-800">
+            Dieses Briefing wurde am {formatDateTime(briefing.generated_at)} erstellt,
+            aber die Warnungsdaten wurden zuletzt am{" "}
+            {stats.last_ingest ? formatDateTime(stats.last_ingest) : "—"} aktualisiert.
+            Die angezeigten Zahlen sind ein Snapshot vom Erstellungszeitpunkt und können
+            von der aktuellen Startseite abweichen.
+          </p>
+          <p className="mt-2 text-sm text-amber-800">
+            Aktualisieren mit:{" "}
+            <code className="rounded bg-amber-100 px-1">
+              python -m app.jobs.cli generate-briefing
+            </code>{" "}
+            oder Ingest mit{" "}
+            <code className="rounded bg-amber-100 px-1">--generate-briefing</code>.
+            Live-Dashboard:{" "}
+            <Link href="/" className="font-medium text-amber-900 underline hover:no-underline">
+              Startseite
+            </Link>
+          </p>
+        </div>
+      )}
+
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -62,25 +106,24 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
             <p className="mt-2 text-lg text-slate-800">{content.summary}</p>
           </div>
           <div className="text-right text-sm text-slate-500">
+            <p className="font-medium text-slate-700">Generiert am</p>
             <p>{formatDateTime(briefing.generated_at)}</p>
-            <p className="mt-1 font-semibold text-slate-900">
-              Risk Score: {briefing.overall_risk_score}/100
+            <p className="mt-2 font-medium text-slate-700">Risk Score (Snapshot)</p>
+            <p className="text-lg font-semibold text-slate-900">
+              {riskScore}/100
             </p>
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Aktive Warnungen" value={stats.active_count} />
-        <StatCard label="Global Risk Score" value={briefing.overall_risk_score} />
+        <StatCard label="Aktive Warnungen (Snapshot)" value={activeCount} />
+        <StatCard label="Global Risk Score (Snapshot)" value={riskScore} />
         <StatCard
           label="Betroffene Regionen"
           value={content.affected_regions.length}
         />
-        <StatCard
-          label="Datenquellen"
-          value={content.by_source?.length ?? 0}
-        />
+        <StatCard label="Datenquellen" value={sourceCount} />
       </div>
 
       {(content.by_source?.length ?? 0) > 0 && (
