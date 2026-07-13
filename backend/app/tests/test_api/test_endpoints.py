@@ -58,6 +58,40 @@ async def test_admin_ingest_with_token(client, db_session) -> None:
     assert data["alerts_fetched"] > 0
 
 
+@pytest.mark.asyncio
+async def test_alerts_bounding_box_filter(client, db_session) -> None:
+    from app.services.ingest_service import run_ingest
+
+    await run_ingest(db_session)
+    db_session.commit()
+
+    # Texas fixture polygons are around lon -97, lat 32-33
+    response = client.get("/api/v1/alerts", params={"bounding_box": "-98,32,-96,34", "country": "US"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] >= 1
+    for item in data["items"]:
+        assert item["country_code"] == "US"
+
+
+@pytest.mark.asyncio
+async def test_alerts_bounding_box_invalid(client) -> None:
+    response = client.get("/api/v1/alerts", params={"bounding_box": "invalid"})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_alerts_bounding_box_empty_region(client, db_session) -> None:
+    from app.services.ingest_service import run_ingest
+
+    await run_ingest(db_session)
+    db_session.commit()
+
+    response = client.get("/api/v1/alerts", params={"bounding_box": "0,0,1,1"})
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
+
 def test_sources(client) -> None:
     response = client.get("/api/v1/sources")
     assert response.status_code == 200

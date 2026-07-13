@@ -1,7 +1,7 @@
 # Global Risk Intelligence MVP
 
-> **Status: Phase 2 — Backend lauffähig**  
-> PostgreSQL/PostGIS, Fixture-Ingest (`DEMO_MODE`), Basis-API. Frontend folgt in Phase 4.
+> **Status: Phase 3 — NOAA live integration**  
+> PostgreSQL/PostGIS, Live NOAA ingest (`DEMO_MODE=false`), Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter. Frontend folgt in Phase 4.
 
 ## Produktbeschreibung
 
@@ -57,9 +57,13 @@ docker compose exec backend alembic upgrade head
 # Demo-Daten ingestieren
 docker compose exec backend python -m app.jobs.cli ingest
 
+# Live NOAA ingest (set NOAA_USER_AGENT in .env first)
+DEMO_MODE=false docker compose exec backend python -m app.jobs.cli ingest --sources noaa
+
 # API testen
 curl http://localhost:8000/health
 curl http://localhost:8000/api/v1/alerts
+curl "http://localhost:8000/api/v1/alerts?bounding_box=-98,32,-96,34&country=US"
 ```
 
 - API: http://localhost:8000
@@ -80,6 +84,9 @@ uvicorn app.main:app --reload
 
 # Demo-Ingest
 DEMO_MODE=true python -m app.jobs.cli ingest
+
+# Live NOAA ingest (requires NOAA_USER_AGENT)
+DEMO_MODE=false SOURCES_LIVE=noaa python -m app.jobs.cli ingest --sources noaa
 ```
 
 ## Tests
@@ -105,7 +112,12 @@ docker compose exec backend pytest -v
 | `LLM_API_KEY` | — | API-Key (nur Backend) |
 | `LLM_MODEL` | `gpt-4o-mini` | Modellname |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS-Origin |
-| `NOAA_USER_AGENT` | `GlobalRiskIntelligence/1.0` | Pflicht-Header für NOAA |
+| `NOAA_USER_AGENT` | `GlobalRiskIntelligence/1.0` | Pflicht-Header für NOAA live |
+| `NOAA_BASE_URL` | `https://api.weather.gov` | NOAA API base URL |
+| `NOAA_FETCH_TIMEOUT_SECONDS` | `30` | HTTP timeout für NOAA |
+| `NOAA_USE_FIXTURES` | `false` | NOAA-Fixtures erzwingen |
+| `NOAA_FALLBACK_TO_FIXTURES` | `true` | Bei Live-Fehler auf Fixtures zurückfallen |
+| `SOURCES_LIVE` | `noaa` | Komma-separierte Live-Quellen |
 | `LOG_LEVEL` | `INFO` | Log-Level |
 
 Vollständige Liste: [.env.example](.env.example)
@@ -122,6 +134,7 @@ Vollständige Liste: [.env.example](.env.example)
 | [docs/architecture.md](docs/architecture.md) | Architektur & Module |
 | [docs/data-model.md](docs/data-model.md) | Kanonisches Alert-Modell |
 | [docs/data-sources.md](docs/data-sources.md) | API-Endpunkte & Mapping |
+| [docs/noaa-mapping.md](docs/noaa-mapping.md) | NOAA/NWS → kanonisches Mapping |
 | [docs/llm-analysis.md](docs/llm-analysis.md) | LLM als Kern-Analyseschicht |
 | [docs/risk-scoring.md](docs/risk-scoring.md) | Risk-Score-Algorithmus |
 | [docs/security.md](docs/security.md) | Threat Model & Maßnahmen |
@@ -132,7 +145,7 @@ Vollständige Liste: [.env.example](.env.example)
 |-------|--------|--------|
 | 1 | Planung & Dokumentation | ✅ |
 | 2 | Backend, PostgreSQL/PostGIS, Fixtures, Basis-API | ✅ |
-| 3 | Live-Quellen (NOAA, NINA, GDACS) | — |
+| 3 | Live NOAA source, bounding_box filter | ✅ |
 | 4 | Dashboard (MapLibre GL JS) | — |
 | 5 | Regelbasierte Analyse & Fallback-Briefing | — |
 | 6 | LLM Cross-Alert-Integration | — |

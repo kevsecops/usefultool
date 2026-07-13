@@ -28,7 +28,14 @@ def get_alerts(
     include_raw: bool = False,
     db: Session = Depends(get_db),
 ) -> AlertListResponse:
+    from app.normalization.bounding_box import BoundingBoxError, parse_bounding_box
     from app.normalization.datetime_utils import parse_datetime
+
+    if bounding_box:
+        try:
+            parse_bounding_box(bounding_box)
+        except BoundingBoxError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     params = AlertQueryParams(
         source=source,
