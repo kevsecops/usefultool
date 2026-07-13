@@ -60,6 +60,7 @@ class PotentialImplications(BaseModel):
 class BriefingContent(BaseModel):
     generated_at: str
     type: str = "rule_based"
+    active_count: int = 0
     overall_risk_score: int = 0
     summary: str = ""
     overall_confidence: str = "low"

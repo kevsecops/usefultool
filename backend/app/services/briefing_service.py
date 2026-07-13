@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
@@ -20,6 +21,26 @@ from app.normalization.datetime_utils import utc_now
 from app.schemas.common import BriefingType
 
 logger = get_logger(__name__)
+
+
+def is_briefing_stale(briefing: Briefing, last_ingest: datetime | None) -> bool:
+    """True when alerts were ingested after this briefing was generated."""
+    if last_ingest is None:
+        return False
+    return briefing.generated_at < last_ingest
+
+
+def _finalize_briefing_content(
+    content: dict,
+    *,
+    risk,
+    active_count: int,
+) -> dict:
+    """Ensure snapshot fields match computed analysis at generation time."""
+    finalized = dict(content)
+    finalized["active_count"] = active_count
+    finalized["overall_risk_score"] = risk.global_score
+    return finalized
 
 
 def generate_briefing(
@@ -80,6 +101,7 @@ def _generate_llm_briefing(db: Session) -> Briefing:
         anomalies=anomalies,
         generated_at=now,
     )
+    content = _finalize_briefing_content(content, risk=risk, active_count=len(alerts))
 
     source_ids = [uuid.UUID(aid) for aid in content["source_alert_ids"]]
 
@@ -109,6 +131,7 @@ def _generate_rule_based_briefing(db: Session) -> Briefing:
         anomalies=anomalies,
         generated_at=now,
     )
+    content = _finalize_briefing_content(content, risk=risk, active_count=len(alerts))
 
     source_ids = [uuid.UUID(aid) for aid in content["source_alert_ids"]]
 

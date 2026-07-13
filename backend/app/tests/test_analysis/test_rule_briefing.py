@@ -138,6 +138,22 @@ def test_briefing_multi_source_breakdown() -> None:
     assert any("NINA/BBK" in lim for lim in briefing["limitations"])
 
 
+def test_briefing_snapshot_fields_consistent() -> None:
+    """active_count, overall_risk_score, and summary must agree at generation time."""
+    alerts = [
+        _make_alert(source="nina", source_alert_id="n1", fingerprint="fp-n1", country_code="DE"),
+        _make_alert(source="noaa", source_alert_id="n2", fingerprint="fp-n2", country_code="US"),
+    ]
+    risk = compute_global_risk_score(alerts, cluster_bonuses=[], rolling_avg_active=2)
+    briefing = generate_rule_briefing(alerts, risk=risk, hotspots=[])
+
+    assert briefing["active_count"] == 2
+    assert briefing["overall_risk_score"] == risk.global_score
+    assert "2 aktive Warnungen" in briefing["summary"]
+    assert f"Global Risk Score: {risk.global_score}/100" in briefing["summary"]
+    assert len(briefing["source_alert_ids"]) == briefing["active_count"]
+
+
 def test_briefing_implications_wildfire_uses_schema_domains() -> None:
     """Wildfire alerts must not emit non-schema implication keys (e.g. environmental)."""
     alerts = [

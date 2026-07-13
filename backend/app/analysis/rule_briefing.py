@@ -302,6 +302,7 @@ def generate_rule_briefing(
     return {
         "generated_at": now.isoformat().replace("+00:00", "Z"),
         "type": "rule_based",
+        "active_count": len(active),
         "overall_risk_score": risk.global_score,
         "summary": _build_summary(
             active,
