@@ -83,7 +83,8 @@ def _top_alerts(alerts: list[Alert], limit: int = 10) -> list[Alert]:
     )[:limit]
 
 
-def _by_source(alerts: list[Alert]) -> list[dict[str, Any]]:
+def build_by_source(alerts: list[Alert]) -> list[dict[str, Any]]:
+    """Per-source alert counts for briefing snapshots."""
     from collections import Counter
 
     counts = Counter(a.source for a in alerts)
@@ -95,6 +96,10 @@ def _by_source(alerts: list[Alert]) -> list[dict[str, Any]]:
         }
         for src, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
     ]
+
+
+def _by_source(alerts: list[Alert]) -> list[dict[str, Any]]:
+    return build_by_source(alerts)
 
 
 def _top_countries(alerts: list[Alert], limit: int = 5) -> list[dict[str, Any]]:

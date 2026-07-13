@@ -1,7 +1,8 @@
 import { getAlerts, getStats } from "@/lib/api";
 import { RiskScoreGauge } from "@/components/RiskScoreGauge";
 import { AlertCard } from "@/components/AlertCard";
-import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { formatDateTime, formatRelativeTime, sourceLabel } from "@/lib/format";
+import type { AlertSource } from "@/types/alert";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function HomePage() {
       by_country: {},
       by_category: {},
       by_severity: {},
+      by_source: {},
       top_countries: [],
       hotspot_regions: [],
       trend_anomalies: [],
@@ -77,7 +79,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="mb-3 font-semibold text-slate-900">
             Top betroffene Regionen
@@ -105,6 +107,29 @@ export default async function HomePage() {
                   <span className="font-medium text-slate-900">{c.count}</span>
                 </li>
               ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Keine Daten verfügbar.</p>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="mb-3 font-semibold text-slate-900">Nach Datenquelle</h2>
+          {Object.keys(stats.by_source ?? {}).length > 0 ? (
+            <ul className="space-y-2">
+              {Object.entries(stats.by_source)
+                .sort(([, a], [, b]) => b - a)
+                .map(([src, count]) => (
+                  <li
+                    key={src}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-slate-700">
+                      {sourceLabel(src as AlertSource)}
+                    </span>
+                    <span className="font-medium text-slate-900">{count}</span>
+                  </li>
+                ))}
             </ul>
           ) : (
             <p className="text-sm text-slate-500">Keine Daten verfügbar.</p>

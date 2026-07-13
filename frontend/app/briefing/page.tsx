@@ -1,10 +1,10 @@
-import { getLatestBriefing, getStats } from "@/lib/api";
+import { getLatestBriefing, getSources, getStats } from "@/lib/api";
 import { BriefingView } from "@/components/BriefingView";
 
 export const dynamic = "force-dynamic";
 
 export default async function BriefingPage() {
-  const stats = await getStats();
+  const [stats, sourcesResponse] = await Promise.all([getStats(), getSources()]);
 
   let briefing = null;
   try {
@@ -21,7 +21,7 @@ export default async function BriefingPage() {
           Globale Risikoanalyse und Zusammenfassung.
         </p>
       </div>
-      <BriefingView briefing={briefing} stats={stats} />
+      <BriefingView briefing={briefing} stats={stats} sources={sourcesResponse.sources} />
     </div>
   );
 }

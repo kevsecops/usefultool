@@ -1,11 +1,14 @@
 import type { Briefing } from "@/types/briefing";
 import type { Stats } from "@/types/stats";
+import type { SourceInfo } from "@/types/source";
 import { categoryLabel, formatDateTime, sourceLabel } from "@/lib/format";
+import { distinctSourceCount, resolveBySource } from "@/lib/briefing";
 import Link from "next/link";
 
 interface BriefingViewProps {
   briefing: Briefing | null;
   stats: Stats;
+  sources?: SourceInfo[];
 }
 
 const CONFIDENCE_LABELS: Record<string, string> = {
@@ -28,7 +31,7 @@ function snapshotRiskScore(briefing: Briefing): number {
   return briefing.content.overall_risk_score ?? briefing.overall_risk_score;
 }
 
-export function BriefingView({ briefing, stats }: BriefingViewProps) {
+export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProps) {
   if (!briefing) {
     return (
       <div className="space-y-6">
@@ -51,7 +54,9 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
   const stale = isBriefingStale(briefing, stats);
   const activeCount = snapshotActiveCount(content);
   const riskScore = snapshotRiskScore(briefing);
-  const sourceCount = content.by_source?.length ?? 0;
+  const bySource = resolveBySource(content, stats);
+  const sourceCount = distinctSourceCount(bySource);
+  const sourceFetchById = new Map(sources.map((s) => [s.id, s.last_fetch]));
 
   return (
     <div className="space-y-6">
@@ -126,24 +131,47 @@ export function BriefingView({ briefing, stats }: BriefingViewProps) {
         <StatCard label="Datenquellen" value={sourceCount} />
       </div>
 
-      {(content.by_source?.length ?? 0) > 0 && (
+      {bySource.items.length > 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h3 className="mb-3 font-semibold text-slate-900">Nach Datenquelle</h3>
+          {bySource.derived && (
+            <p className="mb-3 text-xs text-amber-700">
+              {bySource.reason === "live_stats"
+                ? "Quellenaufteilung aus Live-Statistik (Briefing-Snapshot ohne by_source — bitte Briefing neu generieren)."
+                : "Quellenaufteilung aus wesentlichen Ereignissen geschätzt — bitte Briefing neu generieren für vollständige Snapshot-Daten."}
+            </p>
+          )}
           <ul className="space-y-2">
-            {content.by_source.map((item) => (
+            {bySource.items.map((item) => (
               <li
                 key={item.source}
-                className="flex items-center justify-between text-sm"
+                className="flex items-center justify-between gap-4 text-sm"
               >
-                <span className="text-slate-700">
-                  {item.label || sourceLabel(item.source as Parameters<typeof sourceLabel>[0])}
-                </span>
+                <div>
+                  <span className="text-slate-700">
+                    {item.label || sourceLabel(item.source as Parameters<typeof sourceLabel>[0])}
+                  </span>
+                  {sourceFetchById.get(item.source) && (
+                    <p className="text-xs text-slate-400">
+                      Letzter Abruf: {formatDateTime(sourceFetchById.get(item.source))}
+                    </p>
+                  )}
+                </div>
                 <span className="font-medium text-slate-900">{item.count}</span>
               </li>
             ))}
           </ul>
         </section>
-      )}
+      ) : activeCount > 0 ? (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h3 className="mb-2 font-semibold text-amber-900">Nach Datenquelle</h3>
+          <p className="text-sm text-amber-800">
+            Keine Quellenaufteilung im Snapshot — bitte Briefing neu generieren (
+            <code className="rounded bg-amber-100 px-1">python -m app.jobs.cli generate-briefing</code>
+            ).
+          </p>
+        </section>
+      ) : null}
 
       {(content.top_countries?.length ?? 0) > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
