@@ -61,7 +61,11 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   return qs ? `?${qs}` : "";
 }
 
-export async function getHealth(): Promise<{ status: string; demo_mode: boolean }> {
+export async function getHealth(): Promise<{
+  status: string;
+  demo_mode: boolean;
+  last_ingest_error?: string | null;
+}> {
   return apiFetch("/health");
 }
 

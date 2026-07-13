@@ -1,4 +1,4 @@
-import { getAlerts, getStats } from "@/lib/api";
+import { getAlerts, getHealth, getStats } from "@/lib/api";
 import { RiskScoreGauge } from "@/components/RiskScoreGauge";
 import { AlertCard } from "@/components/AlertCard";
 import { formatDateTime, formatRelativeTime, sourceLabel } from "@/lib/format";
@@ -9,15 +9,18 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   let stats;
   let recentAlerts;
+  let health;
   let error: string | null = null;
 
   try {
-    [stats, recentAlerts] = await Promise.all([
+    [stats, recentAlerts, health] = await Promise.all([
       getStats(),
       getAlerts({ limit: 5, active: true }),
+      getHealth(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "API nicht erreichbar";
+    health = null;
     stats = {
       active_count: 0,
       global_risk_score: 0,
@@ -48,6 +51,19 @@ export default async function HomePage() {
           Backend nicht erreichbar: {error}. Stellen Sie sicher, dass die API
           unter {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}{" "}
           läuft und Daten ingestiert wurden.
+        </div>
+      )}
+
+      {!error && health?.status === "degraded" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-medium">Daten-Pipeline beeinträchtigt</p>
+          <p className="mt-1">
+            {health.last_ingest_error
+              ? `Letzter Ingest-Fehler: ${health.last_ingest_error.slice(0, 240)}${health.last_ingest_error.length > 240 ? "…" : ""}`
+              : "Der letzte Ingest-Lauf war nicht vollständig erfolgreich."}{" "}
+            Das Dashboard zeigt ggf. keine aktuellen Warnungen, bis der nächste
+            Ingest erfolgreich war.
+          </p>
         </div>
       )}
 

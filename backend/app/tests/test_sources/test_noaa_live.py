@@ -8,7 +8,7 @@ import pytest
 
 from app.core.config import get_settings
 from app.core.http_client import HttpClient, HttpClientError
-from app.sources.noaa import NoaaSourceAdapter, extract_noaa_features, resolve_source_url
+from app.sources.noaa import NoaaSourceAdapter, extract_noaa_features, resolve_source_url, _region_from_area_desc
 from app.sources.fixture_loader import load_fixture
 
 FIXTURES_DIR = Path(__file__).resolve().parents[4] / "fixtures" / "noaa"
@@ -68,6 +68,19 @@ def test_resolve_source_url_from_feature_id() -> None:
 def test_resolve_source_url_from_urn() -> None:
     url = resolve_source_url({}, {"id": "urn:oid:abc"})
     assert url == "https://api.weather.gov/alerts/urn:oid:abc"
+
+
+def test_region_from_area_desc_uses_first_zone_and_state() -> None:
+    area = "Niihau; Kauai Southwest; Waianae Coast, HI"
+    assert _region_from_area_desc(area) == "HI"
+
+
+def test_region_from_area_desc_clamps_long_single_zone() -> None:
+    area = "A" * 300
+    region = _region_from_area_desc(area)
+    assert region is not None
+    assert len(region) == 256
+    assert region.endswith("...")
 
 
 @pytest.mark.asyncio

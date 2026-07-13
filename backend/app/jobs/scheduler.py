@@ -51,7 +51,7 @@ async def run_scheduled_ingest() -> None:
             extra={
                 "status": run.status,
                 "fetched": run.alerts_fetched,
-                "created": run.alerts_created,
+                "alerts_created": run.alerts_created,
                 "updated": run.alerts_updated,
                 "deactivated": run.alerts_deactivated,
             },

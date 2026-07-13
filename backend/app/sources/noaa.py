@@ -11,6 +11,7 @@ from app.normalization.datetime_utils import parse_datetime, utc_now
 from app.normalization.geometry import compute_centroid
 from app.normalization.html_sanitizer import sanitize_html
 from app.normalization.severity import normalize_cap_severity
+from app.normalization.strings import clamp_str
 from app.schemas.alert import CanonicalAlert
 from app.schemas.common import AlertSource, AlertStatus, Certainty, Urgency
 from app.sources.base import ParsedAlert, RawAlertPayload, SourceHealth
@@ -75,6 +76,17 @@ def resolve_source_url(feature: dict[str, Any], props: dict[str, Any]) -> str | 
             if candidate.startswith("urn:"):
                 return f"https://api.weather.gov/alerts/{candidate}"
     return None
+
+
+def _region_from_area_desc(area_desc: str) -> str | None:
+    """Derive a short region label from NOAA areaDesc (often multi-zone lists)."""
+    if not area_desc:
+        return None
+    if "," in area_desc:
+        region = area_desc.split(",")[-1].strip()
+    else:
+        region = area_desc.split(";")[0].strip()
+    return clamp_str(region, 256)
 
 
 class NoaaSourceAdapter:
@@ -163,8 +175,8 @@ class NoaaSourceAdapter:
         issued_at = parse_datetime(props.get("sent")) or utc_now()
         lat, lon = compute_centroid(geometry)
 
-        area_desc = props.get("areaDesc", "")
-        region = area_desc.split(",")[-1].strip() if area_desc else None
+        area_desc = props.get("areaDesc", "") or ""
+        region = _region_from_area_desc(area_desc)
 
         source_url = resolve_source_url(
             {"id": feature_id, "properties": props},
@@ -181,7 +193,7 @@ class NoaaSourceAdapter:
             country_code="US",
             country_name="United States",
             region=region,
-            location_name=area_desc,
+            location_name=clamp_str(area_desc or None, 512),
             latitude=lat,
             longitude=lon,
             geometry=geometry,

@@ -331,3 +331,41 @@ async def test_deactivate_fixture_alerts_on_ingest(db_session, monkeypatch) -> N
     assert run.alerts_deactivated >= 1
     assert fixture.is_active is False
 
+
+@pytest.mark.asyncio
+async def test_ingest_clamps_overlong_region(db_session, monkeypatch) -> None:
+    from app.sources.base import ParsedAlert, RawAlertPayload
+    from app.sources.noaa import NoaaSourceAdapter
+
+    long_region = "X" * 400
+    raw = RawAlertPayload(
+        source="noaa",
+        data={
+            "type": "Feature",
+            "id": "urn:oid:test-long-region",
+            "properties": {
+                "event": "Flood Advisory",
+                "severity": "Minor",
+                "areaDesc": f"County A, {long_region}",
+                "sent": "2026-07-13T12:00:00+00:00",
+            },
+            "geometry": None,
+        },
+    )
+
+    async def mock_fetch(self):
+        return [raw]
+
+    monkeypatch.setattr(NoaaSourceAdapter, "fetch_alerts", mock_fetch)
+
+    run = await run_ingest(db_session, sources=["noaa"])
+    db_session.commit()
+
+    assert run.status in ("success", "partial")
+    alert = db_session.scalar(
+        select(Alert).where(Alert.source_alert_id == "urn:oid:test-long-region")
+    )
+    assert alert is not None
+    assert alert.region is not None
+    assert len(alert.region) <= 256
+

@@ -13,6 +13,7 @@ from app.models.observed_event import ObservedEvent
 from app.normalization.datetime_utils import utc_now
 from app.normalization.fingerprint import generate_fingerprint, generate_observed_event_fingerprint
 from app.normalization.geometry import geojson_to_wkt_element
+from app.normalization.strings import clamp_str
 from app.schemas.alert import CanonicalAlert
 from app.schemas.common import IngestRunStatus
 from app.schemas.observed_event import CanonicalObservedEvent
@@ -23,6 +24,32 @@ from app.sources.base import ObservedEventSourceAdapter
 from app.sources.registry import get_adapters
 
 logger = get_logger(__name__)
+
+_ALERT_FIELD_LIMITS: dict[str, int] = {
+    "source_url": 1024,
+    "title": 1024,
+    "country_name": 128,
+    "region": 256,
+    "location_name": 512,
+    "event_type": 256,
+    "language": 16,
+}
+
+_OBSERVED_EVENT_FIELD_LIMITS: dict[str, int] = {
+    "source_url": 1024,
+    "title": 1024,
+    "event_type": 256,
+    "region": 256,
+    "location_name": 512,
+}
+
+
+def _clamp_canonical_fields(canonical, field_limits: dict[str, int]) -> None:
+    """Ensure VARCHAR fields fit DB columns so one long value cannot fail the batch."""
+    for field, max_len in field_limits.items():
+        value = getattr(canonical, field, None)
+        if isinstance(value, str):
+            setattr(canonical, field, clamp_str(value, max_len))
 
 
 def _should_be_active(canonical: CanonicalAlert, now: datetime) -> bool:
@@ -44,6 +71,7 @@ def deactivate_expired_alerts(db: Session, now: datetime | None = None) -> int:
 
 
 def _canonical_to_model(canonical: CanonicalAlert, now: datetime) -> Alert:
+    _clamp_canonical_fields(canonical, _ALERT_FIELD_LIMITS)
     fingerprint = generate_fingerprint(
         source=canonical.source,
         source_alert_id=canonical.source_alert_id,
@@ -88,6 +116,7 @@ def _canonical_to_model(canonical: CanonicalAlert, now: datetime) -> Alert:
 
 
 def _update_alert(existing: Alert, canonical: CanonicalAlert, now: datetime) -> bool:
+    _clamp_canonical_fields(canonical, _ALERT_FIELD_LIMITS)
     new_fp = generate_fingerprint(
         source=canonical.source,
         source_alert_id=canonical.source_alert_id,
@@ -135,6 +164,7 @@ def _update_alert(existing: Alert, canonical: CanonicalAlert, now: datetime) -> 
 
 
 def _observed_event_to_model(canonical: CanonicalObservedEvent, now: datetime) -> ObservedEvent:
+    _clamp_canonical_fields(canonical, _OBSERVED_EVENT_FIELD_LIMITS)
     fingerprint = generate_observed_event_fingerprint(
         source=canonical.source,
         source_event_id=canonical.source_event_id,
@@ -180,6 +210,7 @@ def _observed_event_to_model(canonical: CanonicalObservedEvent, now: datetime) -
 def _update_observed_event(
     existing: ObservedEvent, canonical: CanonicalObservedEvent, now: datetime
 ) -> bool:
+    _clamp_canonical_fields(canonical, _OBSERVED_EVENT_FIELD_LIMITS)
     new_fp = generate_observed_event_fingerprint(
         source=canonical.source,
         source_event_id=canonical.source_event_id,
