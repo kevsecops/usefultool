@@ -14,9 +14,28 @@ from app.normalization.fingerprint import generate_fingerprint
 from app.normalization.geometry import geojson_to_wkt_element
 from app.schemas.alert import CanonicalAlert
 from app.schemas.common import IngestRunStatus
+from app.services.alert_active import is_expired
 from app.sources.registry import get_adapters
 
 logger = get_logger(__name__)
+
+
+def _should_be_active(canonical: CanonicalAlert, now: datetime) -> bool:
+    if canonical.expires_at is not None and canonical.expires_at < now:
+        return False
+    return True
+
+
+def deactivate_expired_alerts(db: Session, now: datetime | None = None) -> int:
+    """Mark all expired alerts inactive (global, all sources)."""
+    now = now or utc_now()
+    active_alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    deactivated = 0
+    for alert in active_alerts:
+        if is_expired(alert, now):
+            alert.is_active = False
+            deactivated += 1
+    return deactivated
 
 
 def _canonical_to_model(canonical: CanonicalAlert, now: datetime) -> Alert:
@@ -59,7 +78,7 @@ def _canonical_to_model(canonical: CanonicalAlert, now: datetime) -> Alert:
         last_seen_at=now,
         raw_payload=canonical.raw_payload,
         fingerprint=fingerprint,
-        is_active=True,
+        is_active=_should_be_active(canonical, now),
     )
 
 
@@ -101,7 +120,7 @@ def _update_alert(existing: Alert, canonical: CanonicalAlert, now: datetime) -> 
         "raw_payload": canonical.raw_payload,
         "fingerprint": new_fp,
         "last_seen_at": now,
-        "is_active": True,
+        "is_active": _should_be_active(canonical, now),
     }
     for key, value in fields_to_update.items():
         if getattr(existing, key) != value:
@@ -123,6 +142,7 @@ async def run_ingest(
         else settings.auto_generate_briefing
     )
     now = utc_now()
+    expired_count = deactivate_expired_alerts(db, now)
     source_label = "all" if not sources else ",".join(sources)
     run = IngestRun(
         started_at=now,
@@ -175,7 +195,7 @@ async def run_ingest(
             logger.exception("Ingest failed for source %s", adapter.source_id)
             errors.append({"source": adapter.source_id, "error": str(exc)})
 
-    deactivated = _deactivate_stale_alerts(db, adapters, seen_keys, now)
+    deactivated = expired_count + _deactivate_stale_alerts(db, adapters, seen_keys, now)
 
     run.finished_at = utc_now()
     run.alerts_fetched = fetched
@@ -215,7 +235,7 @@ def _deactivate_stale_alerts(
 
     for alert in active_alerts:
         key = (alert.source, alert.source_alert_id)
-        expired = alert.expires_at is not None and alert.expires_at < now
+        expired = is_expired(alert, now)
         not_seen = key not in seen_keys
         if not_seen or expired:
             alert.is_active = False

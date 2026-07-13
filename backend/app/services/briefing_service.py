@@ -19,6 +19,7 @@ from app.models.alert import Alert
 from app.models.briefing import Briefing
 from app.normalization.datetime_utils import utc_now
 from app.schemas.common import BriefingType
+from app.services.alert_active import filter_effectively_active
 
 logger = get_logger(__name__)
 
@@ -192,9 +193,15 @@ def _collect_analysis_context(db: Session, alerts: list[Alert], now):
     return hotspots, risk, anomalies
 
 
+def _load_active_alerts(db: Session) -> list[Alert]:
+    now = utc_now()
+    db_alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    return filter_effectively_active(db_alerts, now=now)
+
+
 def _generate_llm_briefing(db: Session) -> Briefing:
     now = utc_now()
-    alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    alerts = _load_active_alerts(db)
     hotspots, risk, anomalies = _collect_analysis_context(db, alerts, now)
 
     content, llm_model = generate_llm_briefing_content(
@@ -227,7 +234,7 @@ def _generate_llm_briefing(db: Session) -> Briefing:
 
 def _generate_rule_based_briefing(db: Session) -> Briefing:
     now = utc_now()
-    alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
+    alerts = _load_active_alerts(db)
     hotspots, risk, anomalies = _collect_analysis_context(db, alerts, now)
     content = generate_rule_briefing(
         alerts,

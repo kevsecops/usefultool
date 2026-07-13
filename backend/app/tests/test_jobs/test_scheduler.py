@@ -38,3 +38,15 @@ async def test_scheduler_disabled_by_default(monkeypatch) -> None:
     settings = get_settings()
     assert settings.scheduler_enabled is False
     assert settings.ingest_interval_minutes == 15
+    assert settings.auto_generate_briefing is True
+    assert settings.scheduler_generate_briefing is True
+    assert settings.scheduler_startup_delay_seconds == 30
+
+
+def test_scheduler_enabled_via_env(monkeypatch) -> None:
+    monkeypatch.setenv("SCHEDULER_ENABLED", "true")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert settings.scheduler_enabled is True

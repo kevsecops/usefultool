@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
 from app.services.briefing_service import generate_briefing
-from app.services.ingest_service import run_ingest
+from app.services.ingest_service import deactivate_expired_alerts, run_ingest
 
 logger = get_logger(__name__)
 
@@ -19,6 +19,9 @@ async def run_scheduled_ingest() -> None:
     settings = get_settings()
     db = SessionLocal()
     try:
+        expired = deactivate_expired_alerts(db)
+        if expired:
+            logger.info("Pre-ingest: deactivated %d expired alerts", expired)
         run = await run_ingest(
             db,
             generate_briefing=settings.scheduler_generate_briefing,
