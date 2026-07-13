@@ -26,6 +26,7 @@ export default async function HomePage() {
       by_severity: {},
       top_countries: [],
       hotspot_regions: [],
+      trend_anomalies: [],
       last_ingest: null,
     };
     recentAlerts = { items: [], total: 0, limit: 5, offset: 0 };

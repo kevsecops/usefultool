@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 2048
 
     risk_score_scaling: int = 50
+    risk_cluster_radius_km: int = 100
+    risk_trend_window_days: int = 7
 
 
 @lru_cache
