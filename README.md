@@ -19,8 +19,12 @@
 | GDACS | International (Naturgefahren) | `https://www.gdacs.org/gdacsapi` |
 | NOAA/NWS (full USA) | USA | `https://api.weather.gov/alerts/active` |
 | USGS Earthquakes | Global (observed events) | `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson` |
+| NASA EONET | Global (natural events) | `https://eonet.gsfc.nasa.gov/api/v3/events?status=open` |
+| NOAA SWPC | Global (space weather) | `https://services.swpc.noaa.gov/products/` |
 
 **Showcase Phase 1:** USGS-Erdbeben werden als `observed_events` ingestiert (separat von `alerts`). API: `GET /api/v1/observed-events`. Siehe [docs/usgs-mapping.md](docs/usgs-mapping.md).
+
+**Showcase Phase 2:** NASA EONET (Waldbrand, Sturm, Vulkan, …) und NOAA SWPC (G/S/R-Raumwetter) als `observed_events`. API: `GET /api/v1/observed-events`, `GET /api/v1/space-weather`. Siehe [docs/eonet-mapping.md](docs/eonet-mapping.md), [docs/space-weather.md](docs/space-weather.md).
 
 Details: [docs/data-sources.md](docs/data-sources.md)
 

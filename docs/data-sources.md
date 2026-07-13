@@ -384,25 +384,76 @@ Deployment und Scheduling: [docs/deployment.md](deployment.md), [docs/n8n-integr
 
 ---
 
+## 4. NASA EONET — Natural Events (Showcase Phase 2)
+
+### Offiziellkeit
+
+| Aspekt | Bewertung |
+|--------|-----------|
+| API | **Offiziell** — [NASA EONET API v3](https://eonet.gsfc.nasa.gov/docs/v3) |
+| Host | `eonet.gsfc.nasa.gov` |
+
+### Primäre Endpunkte
+
+| Endpunkt | Methode | Zweck | Verifiziert |
+|----------|---------|-------|-------------|
+| `/api/v3/events?status=open` | GET | Aktive Naturereignisse | ✅ 200 |
+| `/api/v3/events/{id}` | GET | Event-Detail inkl. Geometrie-Historie | ✅ 200 |
+| `/api/v3/categories` | GET | Kategorie-Taxonomie | ✅ 200 |
+
+**Basis:** `https://eonet.gsfc.nasa.gov/api/v3`
+
+Mapping: [docs/eonet-mapping.md](eonet-mapping.md)  
+Fixtures: `fixtures/eonet/events_open.json`
+
+---
+
+## 5. NOAA SWPC — Space Weather (Showcase Phase 2)
+
+### Offiziellkeit
+
+| Aspekt | Bewertung |
+|--------|-----------|
+| API | **Offiziell** — [NOAA SWPC](https://www.swpc.noaa.gov/) |
+| Host | `services.swpc.noaa.gov` |
+
+**Hinweis:** Separater Adapter `noaa_swpc` — nicht zu verwechseln mit `noaa` (NWS).
+
+### Primäre Endpunkte
+
+| Endpunkt | Methode | Zweck | Verifiziert |
+|----------|---------|-------|-------------|
+| `/products/noaa-scales.json` | GET | G/S/R-Skalen (aktuell + Prognose) | ✅ 200 |
+| `/products/alerts.json` | GET | Aktive SWPC Alerts/Warnings | ✅ 200 |
+
+**Basis:** `https://services.swpc.noaa.gov/products`
+
+Dokumentation: [docs/space-weather.md](space-weather.md), [docs/noaa-swpc-mapping.md](noaa-swpc-mapping.md)  
+Fixtures: `fixtures/noaa_swpc/conditions.json`
+
+---
+
 ## Quellenvergleich
 
-| Kriterium | NINA | GDACS | NOAA |
-|-----------|------|-------|------|
-| Offiziell | Host ja, Doku community | Ja | Ja |
-| Auth | Nein | Nein | Nein (UA Pflicht) |
-| Format | JSON (CAP-like) | GeoJSON | GeoJSON (JSON-LD) |
-| Geo-Detail | Separate GeoJSON-URL | Point + optional Polygon | Polygon in Feature |
-| Rate Limit | Unbekannt | Unbekannt | ~30s empfohlen |
-| Abdeckung | DE | Global (Natur) | US |
-| DEMO_MODE | Fixtures | Fixtures | Fixtures |
+| Kriterium | NINA | GDACS | NOAA | USGS | EONET | NOAA SWPC |
+|-----------|------|-------|------|------|-------|-----------|
+| Offiziell | Host ja | Ja | Ja | Ja | Ja | Ja |
+| Record type | alert | alert | alert | observed_event | observed_event | observed_event |
+| Format | JSON (CAP-like) | GeoJSON | GeoJSON | GeoJSON | JSON | JSON |
+| Geo-Detail | Polygon | Point/Polygon | Polygon | Point | Point/Line/Polygon | Global/zonal |
+| Abdeckung | DE | Global (Natur) | US | Global (EQ) | Global (Natur) | Global (Raumwetter) |
+| DEMO_MODE | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures |
 
-## Ingest-Polling-Empfehlung (Phase 7)
+## Ingest-Polling-Empfehlung (Phase 7 + Showcase)
 
 | Quelle | Mindestintervall | Begründung |
 |--------|------------------|------------|
-| NOAA | 30–60s | Cache max-age=5, Rate-Limit-Vorsicht |
+| NOAA NWS | 30–60s | Cache max-age=5, Rate-Limit-Vorsicht |
+| NOAA SWPC | 5–15 min | Alerts ändern sich schneller als Skalen |
 | NINA | 60–120s | Cache max-age=10, Detail-Fetches |
 | GDACS | 300s | Langsamere Event-Entwicklung |
+| USGS | 60–300s | Feed aktualisiert häufig |
+| EONET | 300–900s | Open-Feed ausreichend |
 
 **Gesamt-Ingest (alle Quellen):** Mindestens **15 Minuten** empfohlen (`INGEST_INTERVAL_MINUTES=15`). Schnellere Intervalle nur mit quellenspezifischem Scheduling (z. B. n8n) und unter Beachtung der Limits oben.
 

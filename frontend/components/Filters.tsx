@@ -13,6 +13,13 @@ const SOURCES: { value: AlertSource; label: string }[] = [
   { value: "gdacs", label: "GDACS" },
 ];
 
+/** Observed-event sources — ready for Phase 6 UI; not wired to alert list yet. */
+export const OBSERVED_EVENT_SOURCES: { value: string; label: string }[] = [
+  { value: "usgs", label: "USGS Earthquakes" },
+  { value: "eonet", label: "NASA EONET" },
+  { value: "noaa_swpc", label: "NOAA Space Weather" },
+];
+
 const SEVERITIES: { value: Severity; label: string }[] = [
   { value: "extreme", label: "Extrem" },
   { value: "severe", label: "Schwer" },

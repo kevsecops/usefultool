@@ -2,11 +2,12 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import admin, alerts, briefings, observed_events, sources, stats
+from app.api.v1 import admin, alerts, briefings, observed_events, sources, space_weather, stats
 
 router = APIRouter()
 router.include_router(alerts.router)
 router.include_router(observed_events.router)
+router.include_router(space_weather.router)
 router.include_router(sources.router)
 router.include_router(stats.router)
 router.include_router(briefings.router)

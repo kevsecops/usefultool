@@ -16,6 +16,8 @@ class DataSource(StrEnum):
     GDACS = "gdacs"
     NOAA = "noaa"
     USGS = "usgs"
+    EONET = "eonet"
+    NOAA_SWPC = "noaa_swpc"
 
 
 class RecordType(StrEnum):
@@ -33,7 +35,9 @@ class ObservedEventStatus(StrEnum):
 class SpatialScope(StrEnum):
     LOCAL = "local"
     REGIONAL = "regional"
+    CONTINENTAL = "continental"
     GLOBAL = "global"
+    ORBITAL = "orbital"
 
 
 class Severity(StrEnum):

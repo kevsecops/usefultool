@@ -81,6 +81,8 @@ async def test_alert_ingest_unaffected_by_usgs(db_session) -> None:
 
     assert run.alerts_fetched > 0
     alert_count = db_session.scalar(select(func.count()).select_from(Alert))
-    event_count = db_session.scalar(select(func.count()).select_from(ObservedEvent))
+    usgs_count = db_session.scalar(
+        select(func.count()).select_from(ObservedEvent).where(ObservedEvent.source == "usgs")
+    )
     assert alert_count > 0
-    assert event_count == 3
+    assert usgs_count == 3

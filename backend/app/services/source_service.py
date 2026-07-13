@@ -12,6 +12,8 @@ _SOURCE_NAMES = {
     "gdacs": "GDACS International",
     "noaa": "NOAA/NWS USA",
     "usgs": "USGS Earthquakes",
+    "eonet": "NASA EONET Natural Events",
+    "noaa_swpc": "NOAA Space Weather (SWPC)",
 }
 
 

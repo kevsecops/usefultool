@@ -1,0 +1,37 @@
+{
+  "alerts": [
+    {
+      "product_id": "K09A",
+      "issue_datetime": "2026-07-12T18:03:00Z",
+      "message": "Space Weather Message Code: ALTK09\r\nSerial Number: 1042\r\nIssue Time: 2026 Jul 12 1803 UTC\r\n\r\nALERT: Geomagnetic K-index of 9 \nThreshold Reached: 2026 Jul 12 1759 UTC\nSynoptic Period: 1500-1800\nActive Warning: YES\nNoaa Scale: G4 - Severe\nComment: \r\n\nNOAA Scale: G4 - Severe\r\n\r\nNOAA Space Weather Scale descriptions can be found at\r\nwww.swpc.noaa.gov/noaa-scales-explanation\r\n\r\nPotential Impacts: Area of impact primarily poleward of 50 degrees Geomagnetic Latitude.\r\nInduced Currents - Possible widespread voltage problems.\r\nSpacecraft - Systems may experience surface charging; increased drag on low Earth-orbit satellites.\r\nAurora - Aurora may be seen as low as Pennsylvania to Iowa to Oregon."
+    },
+    {
+      "product_id": "R02A",
+      "issue_datetime": "2026-07-11T14:27:00Z",
+      "message": "Space Weather Message Code: ALTR02\r\nSerial Number: 892\r\nIssue Time: 2026 Jul 11 1427 UTC\r\n\r\nALERT: Type II Radio Emission \nBegin Time: 2026 Jul 11 1415 UTC\nEstimated Velocity: 1200 km/s\r\n\r\nNOAA Scale: R2 - Moderate\r\n\r\nNOAA Space Weather Scale descriptions can be found at\r\nwww.swpc.noaa.gov/noaa-scales-explanation\r\n\r\nPotential Impacts: Area of impact primarily poleward of 60 degrees Geomagnetic Latitude.\r\nHF Radio - Limited blackout of HF radio communication on sunlit side of Earth."
+    }
+  ],
+  "scales": {
+    "-1": {
+      "DateStamp": "2026-07-12",
+      "TimeStamp": "18:00:00",
+      "R": { "Scale": "2", "Text": "moderate", "MinorProb": null, "MajorProb": null },
+      "S": { "Scale": "0", "Text": "none", "Prob": null },
+      "G": { "Scale": "4", "Text": "severe" }
+    },
+    "0": {
+      "DateStamp": "2026-07-13",
+      "TimeStamp": "12:00:00",
+      "R": { "Scale": "1", "Text": "minor", "MinorProb": null, "MajorProb": null },
+      "S": { "Scale": "0", "Text": "none", "Prob": null },
+      "G": { "Scale": "3", "Text": "strong" }
+    },
+    "1": {
+      "DateStamp": "2026-07-14",
+      "TimeStamp": "00:00:00",
+      "R": { "Scale": null, "Text": null, "MinorProb": "15", "MajorProb": "1" },
+      "S": { "Scale": null, "Text": null, "Prob": "1" },
+      "G": { "Scale": "2", "Text": "moderate" }
+    }
+  }
+}

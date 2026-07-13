@@ -1,5 +1,17 @@
 export type AlertSource = "nina" | "gdacs" | "noaa";
 
+/** Observed-event sources (Phase 1–2); not used for alert filters yet. */
+export type ObservedEventSource = "usgs" | "eonet" | "noaa_swpc";
+
+export type DataSource = AlertSource | ObservedEventSource;
+
+export type SpatialScope =
+  | "local"
+  | "regional"
+  | "continental"
+  | "global"
+  | "orbital";
+
 export type Severity = "unknown" | "minor" | "moderate" | "severe" | "extreme";
 
 export type Urgency =
@@ -66,6 +78,34 @@ export interface Alert {
   ingest_mode?: "live" | "fixture";
 }
 
+export interface ObservedEvent {
+  id: string;
+  source: ObservedEventSource;
+  source_event_id: string;
+  source_url: string | null;
+  title: string;
+  description: string | null;
+  event_type: string | null;
+  category: Category;
+  severity: Severity;
+  status: string;
+  confidence: string;
+  location_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geometry: GeoJSON.Geometry | null;
+  spatial_scope: SpatialScope;
+  affected_latitude_min: number | null;
+  affected_latitude_max: number | null;
+  issued_at: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  source_metadata?: Record<string, unknown> | null;
+  fingerprint: string;
+  is_active: boolean;
+  ingest_mode?: "live" | "fixture";
+}
+
 export interface AlertListResponse {
   items: Alert[];
   total: number;
@@ -81,6 +121,16 @@ export interface AlertFilters {
   active?: boolean;
   issued_after?: string;
   issued_before?: string;
+  bounding_box?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ObservedEventFilters {
+  source?: ObservedEventSource;
+  category?: Category;
+  severity?: Severity;
+  active?: boolean;
   bounding_box?: string;
   limit?: number;
   offset?: number;

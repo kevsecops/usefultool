@@ -44,6 +44,8 @@ services:
       NINA_BASE_URL: "https://warnung.bund.de/api31"
       GDACS_BASE_URL: "https://www.gdacs.org"
       USGS_BASE_URL: "https://earthquake.usgs.gov/earthquakes/feed/v1.0"
+      EONET_BASE_URL: "https://eonet.gsfc.nasa.gov/api/v3"
+      NOAA_SWPC_BASE_URL: "https://services.swpc.noaa.gov/products"
       # Built-in scheduler handles ingest+briefing — n8n is optional (see docs/n8n-integration.md)
       SCHEDULER_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "15"
