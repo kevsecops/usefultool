@@ -21,10 +21,13 @@
 | USGS Earthquakes | Global (observed events) | `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson` |
 | NASA EONET | Global (natural events) | `https://eonet.gsfc.nasa.gov/api/v3/events?status=open` |
 | NOAA SWPC | Global (space weather) | `https://services.swpc.noaa.gov/products/` |
+| NASA FIRMS | Regional fire clusters (VIIRS) | `https://firms.modaps.eosdis.nasa.gov/api/area/csv/` |
 
 **Showcase Phase 1:** USGS-Erdbeben werden als `observed_events` ingestiert (separat von `alerts`). API: `GET /api/v1/observed-events`. Siehe [docs/usgs-mapping.md](docs/usgs-mapping.md).
 
 **Showcase Phase 2:** NASA EONET (Waldbrand, Sturm, Vulkan, …) und NOAA SWPC (G/S/R-Raumwetter) als `observed_events`. API: `GET /api/v1/observed-events`, `GET /api/v1/space-weather`. Siehe [docs/eonet-mapping.md](docs/eonet-mapping.md), [docs/space-weather.md](docs/space-weather.md).
+
+**Showcase Phase 3:** NASA FIRMS thermal anomalies werden **während Ingest geclustert** — nur Aggregat-Cluster als `observed_events` (`active_fire_cluster`), nie einzelne Punkte. API: `GET /api/v1/fire-clusters`. Siehe [docs/firms-mapping.md](docs/firms-mapping.md), [docs/fire-clustering.md](docs/fire-clustering.md).
 
 Details: [docs/data-sources.md](docs/data-sources.md)
 

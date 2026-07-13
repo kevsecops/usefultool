@@ -46,6 +46,9 @@ def list_observed_events(
     if params.source:
         query = query.where(ObservedEvent.source == params.source)
         count_query = count_query.where(ObservedEvent.source == params.source)
+    if params.event_type:
+        query = query.where(ObservedEvent.event_type == params.event_type)
+        count_query = count_query.where(ObservedEvent.event_type == params.event_type)
     if params.category:
         query = query.where(ObservedEvent.category == params.category)
         count_query = count_query.where(ObservedEvent.category == params.category)

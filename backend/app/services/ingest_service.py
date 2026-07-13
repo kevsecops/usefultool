@@ -377,6 +377,12 @@ async def run_ingest(
 
             health = await adapter.health_check()
             health.records_fetched = source_fetched
+            if hasattr(adapter, "last_raw_points_fetched"):
+                health.extra_metrics = {
+                    **(health.extra_metrics or {}),
+                    "raw_points_fetched": adapter.last_raw_points_fetched,
+                    "clusters_persisted": source_fetched,
+                }
             upsert_source_status(
                 db,
                 health,
@@ -384,12 +390,17 @@ async def run_ingest(
             )
 
             logger.info(
-                "Ingest source=%s type=%s fetched=%d created=%d updated=%d",
+                "Ingest source=%s type=%s fetched=%d created=%d updated=%d%s",
                 adapter.source_id,
                 getattr(adapter, "record_type", "alert"),
                 source_fetched,
                 source_created,
                 source_updated,
+                (
+                    f" raw_points={adapter.last_raw_points_fetched}"
+                    if hasattr(adapter, "last_raw_points_fetched")
+                    else ""
+                ),
             )
         except Exception as exc:
             logger.exception("Ingest failed for source %s", adapter.source_id)

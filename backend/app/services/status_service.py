@@ -156,6 +156,7 @@ async def get_admin_status(db: Session) -> dict:
                 "records_fetched": health.records_fetched,
                 "alerts_fetched": health.records_fetched,
                 "error_message": health.error_message,
+                "extra_metrics": health.extra_metrics,
             }
         )
 

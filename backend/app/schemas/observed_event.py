@@ -92,6 +92,7 @@ class ObservedEventListResponse(BaseModel):
 
 class ObservedEventQueryParams(BaseModel):
     source: DataSource | None = None
+    event_type: str | None = None
     category: Category | None = None
     severity: Severity | None = None
     active: bool = True

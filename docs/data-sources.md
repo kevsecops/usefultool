@@ -433,16 +433,44 @@ Fixtures: `fixtures/noaa_swpc/conditions.json`
 
 ---
 
+## 6. NASA FIRMS — Active Fire Clusters (Showcase Phase 3)
+
+### Offiziellkeit
+
+| Aspekt | Bewertung |
+|--------|-----------|
+| API | **Offiziell** — [NASA FIRMS / LANCE](https://firms.modaps.eosdis.nasa.gov/) |
+| Host | `firms.modaps.eosdis.nasa.gov` |
+| Auth | Free `MAP_KEY` (email registration) |
+
+**Kritisch:** FIRMS liefert viele Punkt-Detektionen. Der Adapter clustert **während Ingest** und speichert nur Aggregate als `observed_events` (`event_type=active_fire_cluster`).
+
+### Primärer Endpunkt
+
+| Endpunkt | Methode | Zweck | Verifiziert |
+|----------|---------|-------|-------------|
+| `/api/area/csv/{MAP_KEY}/{SOURCE}/{AREA}/{DAY_RANGE}` | GET | Thermal anomalies (CSV) | ✅ (mit MAP_KEY) |
+| `/api/map_key/{MAP_KEY}` | GET | Key status / rate-limit | ✅ |
+
+**Basis:** `https://firms.modaps.eosdis.nasa.gov`
+
+**Default:** `VIIRS_SNPP_NRT`, Area `0,36,20,46` (Südeuropa/Mittelmeer), `DAY_RANGE=1`
+
+Dokumentation: [docs/firms-mapping.md](firms-mapping.md), [docs/fire-clustering.md](fire-clustering.md)  
+Fixtures: `fixtures/firms/mediterranean_points.json`
+
+---
+
 ## Quellenvergleich
 
-| Kriterium | NINA | GDACS | NOAA | USGS | EONET | NOAA SWPC |
-|-----------|------|-------|------|------|-------|-----------|
-| Offiziell | Host ja | Ja | Ja | Ja | Ja | Ja |
-| Record type | alert | alert | alert | observed_event | observed_event | observed_event |
-| Format | JSON (CAP-like) | GeoJSON | GeoJSON | GeoJSON | JSON | JSON |
-| Geo-Detail | Polygon | Point/Polygon | Polygon | Point | Point/Line/Polygon | Global/zonal |
-| Abdeckung | DE | Global (Natur) | US | Global (EQ) | Global (Natur) | Global (Raumwetter) |
-| DEMO_MODE | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures |
+| Kriterium | NINA | GDACS | NOAA | USGS | EONET | NOAA SWPC | FIRMS |
+|-----------|------|-------|------|------|-------|-----------|-------|
+| Offiziell | Host ja | Ja | Ja | Ja | Ja | Ja | Ja |
+| Record type | alert | alert | alert | observed_event | observed_event | observed_event | observed_event |
+| Format | JSON (CAP-like) | GeoJSON | GeoJSON | GeoJSON | JSON | JSON | CSV → cluster |
+| Geo-Detail | Polygon | Point/Polygon | Polygon | Point | Point/Line/Polygon | Global/zonal | Cluster polygon |
+| Abdeckung | DE | Global (Natur) | US | Global (EQ) | Global (Natur) | Global (Raumwetter) | Konfigurierbare Area |
+| DEMO_MODE | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures |
 
 ## Ingest-Polling-Empfehlung (Phase 7 + Showcase)
 
@@ -454,6 +482,7 @@ Fixtures: `fixtures/noaa_swpc/conditions.json`
 | GDACS | 300s | Langsamere Event-Entwicklung |
 | USGS | 60–300s | Feed aktualisiert häufig |
 | EONET | 300–900s | Open-Feed ausreichend |
+| FIRMS | 300–900s | Area-CSV; cluster during ingest; MAP_KEY rate limits |
 
 **Gesamt-Ingest (alle Quellen):** Mindestens **15 Minuten** empfohlen (`INGEST_INTERVAL_MINUTES=15`). Schnellere Intervalle nur mit quellenspezifischem Scheduling (z. B. n8n) und unter Beachtung der Limits oben.
 

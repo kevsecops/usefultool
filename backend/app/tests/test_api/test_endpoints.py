@@ -99,6 +99,6 @@ def test_sources(client) -> None:
     response = client.get("/api/v1/sources")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["sources"]) == 6
+    assert len(data["sources"]) == 7
     source_ids = {s["id"] for s in data["sources"]}
-    assert source_ids == {"nina", "gdacs", "noaa", "usgs", "eonet", "noaa_swpc"}
+    assert source_ids == {"nina", "gdacs", "noaa", "usgs", "eonet", "noaa_swpc", "firms"}

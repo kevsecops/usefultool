@@ -68,6 +68,22 @@ class Settings(BaseSettings):
     noaa_swpc_use_fixtures: bool = False
     noaa_swpc_fallback_to_fixtures: bool = True
 
+    firms_user_agent: str = "GlobalRiskIntelligence/1.0 (contact@example.com)"
+    firms_base_url: str = "https://firms.modaps.eosdis.nasa.gov"
+    firms_map_key: str = ""
+    firms_product: str = "VIIRS_SNPP_NRT"
+    firms_area_coords: str = "0,36,20,46"
+    firms_day_range: int = 1
+    firms_region_label: str = "Southern Europe / Mediterranean"
+    firms_fetch_timeout_seconds: float = 30.0
+    firms_max_response_bytes: int = 50 * 1024 * 1024
+    firms_max_retries: int = 3
+    firms_use_fixtures: bool = False
+    firms_fallback_to_fixtures: bool = True
+    firms_cluster_grid_deg: float = 0.5
+    firms_cluster_time_hours: float = 24.0
+    firms_min_cluster_points: int = 3
+
     llm_enabled: bool = False
     llm_provider: str = "mock"
     llm_base_url: str = ""

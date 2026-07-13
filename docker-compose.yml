@@ -46,6 +46,8 @@ services:
       USGS_BASE_URL: "https://earthquake.usgs.gov/earthquakes/feed/v1.0"
       EONET_BASE_URL: "https://eonet.gsfc.nasa.gov/api/v3"
       NOAA_SWPC_BASE_URL: "https://services.swpc.noaa.gov/products"
+      FIRMS_BASE_URL: "https://firms.modaps.eosdis.nasa.gov"
+      FIRMS_USE_FIXTURES: "true"
       # Built-in scheduler handles ingest+briefing — n8n is optional (see docs/n8n-integration.md)
       SCHEDULER_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "15"

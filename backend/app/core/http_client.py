@@ -66,6 +66,56 @@ class HttpClient:
                     return url_part[1:-1]
         return None
 
+    async def get_text(self, url: str, params: dict[str, Any] | None = None) -> str:
+        self._validate_url(url)
+        last_error: Exception | None = None
+        headers = {
+            "User-Agent": self.user_agent,
+            "Accept": "text/csv, text/plain, */*",
+        }
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout_seconds,
+                    transport=self._transport,
+                    follow_redirects=True,
+                ) as client:
+                    response = await client.get(url, params=params, headers=headers)
+
+                    if len(response.content) > self.max_response_bytes:
+                        raise HttpClientError(
+                            f"Response exceeds max size ({self.max_response_bytes} bytes)"
+                        )
+
+                    if response.status_code in RETRYABLE_STATUS_CODES and attempt < self.max_retries:
+                        delay = 2**attempt
+                        await asyncio.sleep(delay)
+                        continue
+
+                    response.raise_for_status()
+                    return response.text
+
+            except httpx.TimeoutException as exc:
+                last_error = exc
+                if attempt < self.max_retries:
+                    await asyncio.sleep(2**attempt)
+                    continue
+            except httpx.HTTPStatusError as exc:
+                last_error = exc
+                if exc.response.status_code not in RETRYABLE_STATUS_CODES:
+                    raise HttpClientError(str(exc)) from exc
+                if attempt < self.max_retries:
+                    await asyncio.sleep(2**attempt)
+                    continue
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt < self.max_retries:
+                    await asyncio.sleep(2**attempt)
+                    continue
+
+        raise HttpClientError(f"Request failed after {self.max_retries + 1} attempts: {last_error}")
+
     async def get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         data, _ = await self._request_json(url, params=params)
         if not isinstance(data, dict):

@@ -46,6 +46,7 @@ class SourceHealth:
     ingest_mode: str | None = None
     records_fetched: int | None = None
     alerts_fetched: int | None = None
+    extra_metrics: dict[str, Any] | None = None
 
 
 class BaseSourceAdapter(Protocol):

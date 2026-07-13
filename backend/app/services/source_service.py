@@ -14,6 +14,7 @@ _SOURCE_NAMES = {
     "usgs": "USGS Earthquakes",
     "eonet": "NASA EONET Natural Events",
     "noaa_swpc": "NOAA Space Weather (SWPC)",
+    "firms": "NASA FIRMS Active Fire Clusters",
 }
 
 

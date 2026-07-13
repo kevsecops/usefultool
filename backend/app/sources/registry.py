@@ -2,6 +2,7 @@
 
 from app.sources.base import BaseSourceAdapter
 from app.sources.eonet import EonetSourceAdapter
+from app.sources.firms import FirmsSourceAdapter
 from app.sources.gdacs import GdacsSourceAdapter
 from app.sources.nina import NinaSourceAdapter
 from app.sources.noaa import NoaaSourceAdapter
@@ -15,6 +16,7 @@ _ADAPTERS: dict[str, type] = {
     "usgs": UsgsSourceAdapter,
     "eonet": EonetSourceAdapter,
     "noaa_swpc": NoaaSwpcSourceAdapter,
+    "firms": FirmsSourceAdapter,
 }
 
 

@@ -1,0 +1,25 @@
+{
+  "description": "Demo FIRMS thermal anomalies — 3 clusters in Southern Europe (Spain, Greece, Portugal)",
+  "product": "VIIRS_SNPP_NRT",
+  "area_coords": "0,36,20,46",
+  "points": [
+    {"latitude": 38.42, "longitude": -1.05, "brightness": 320.1, "frp": 45.2, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1200"},
+    {"latitude": 38.44, "longitude": -1.02, "brightness": 335.5, "frp": 62.8, "confidence": "high", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1215"},
+    {"latitude": 38.46, "longitude": -1.08, "brightness": 310.0, "frp": 38.1, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1230"},
+    {"latitude": 38.48, "longitude": -1.01, "brightness": 342.0, "frp": 88.4, "confidence": "high", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1245"},
+
+    {"latitude": 38.02, "longitude": 23.52, "brightness": 305.5, "frp": 28.0, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1100"},
+    {"latitude": 38.04, "longitude": 23.55, "brightness": 318.2, "frp": 41.5, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1115"},
+    {"latitude": 38.06, "longitude": 23.58, "brightness": 325.0, "frp": 55.0, "confidence": "high", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1130"},
+    {"latitude": 38.08, "longitude": 23.60, "brightness": 330.8, "frp": 72.3, "confidence": "high", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1145"},
+
+    {"latitude": 40.12, "longitude": -8.05, "brightness": 298.0, "frp": 22.5, "confidence": "low", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1000"},
+    {"latitude": 40.14, "longitude": -8.02, "brightness": 312.4, "frp": 35.8, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1015"},
+    {"latitude": 40.16, "longitude": -8.08, "brightness": 328.9, "frp": 48.2, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1030"},
+    {"latitude": 40.18, "longitude": -8.01, "brightness": 340.1, "frp": 95.0, "confidence": "high", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1045"},
+    {"latitude": 40.20, "longitude": -8.04, "brightness": 315.0, "frp": 40.0, "confidence": "nominal", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "1100"},
+
+    {"latitude": 41.50, "longitude": 2.10, "brightness": 290.0, "frp": 8.0, "confidence": "low", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "0900"},
+    {"latitude": 41.52, "longitude": 2.12, "brightness": 295.0, "frp": 10.0, "confidence": "low", "satellite": "N", "instrument": "VIIRS", "acq_date": "2026-07-13", "acq_time": "0915"}
+  ]
+}

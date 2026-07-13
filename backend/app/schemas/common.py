@@ -18,6 +18,7 @@ class DataSource(StrEnum):
     USGS = "usgs"
     EONET = "eonet"
     NOAA_SWPC = "noaa_swpc"
+    FIRMS = "firms"
 
 
 class RecordType(StrEnum):
