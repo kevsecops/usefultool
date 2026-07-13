@@ -9,8 +9,14 @@ from app.schemas.admin import IngestRequest, IngestResponse
 from app.schemas.briefing import GenerateBriefingRequest, GenerateBriefingResponse
 from app.services.briefing_service import generate_briefing
 from app.services.ingest_service import run_ingest
+from app.services.status_service import get_admin_status
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+@router.get("/status", dependencies=[Depends(verify_admin_token)])
+async def admin_status(db: Session = Depends(get_db)) -> dict:
+    return await get_admin_status(db)
 
 
 @router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(verify_admin_token)])

@@ -3,22 +3,39 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import Any
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
-from app.services.briefing_service import generate_briefing
 from app.services.ingest_service import deactivate_expired_alerts, run_ingest
 
 logger = get_logger(__name__)
 
+_last_scheduler_run_at: datetime | None = None
+_last_scheduler_error: str | None = None
+
+
+def get_last_scheduler_run_at() -> datetime | None:
+    return _last_scheduler_run_at
+
+
+def get_last_scheduler_error() -> str | None:
+    return _last_scheduler_error
+
 
 async def run_scheduled_ingest() -> None:
     """Run one ingest cycle (and optional briefing) in a fresh DB session."""
+    global _last_scheduler_run_at, _last_scheduler_error
+
     settings = get_settings()
     db = SessionLocal()
     try:
+        logger.info(
+            "Scheduled ingest starting",
+            extra={"demo_mode": settings.demo_mode},
+        )
         expired = deactivate_expired_alerts(db)
         if expired:
             logger.info("Pre-ingest: deactivated %d expired alerts", expired)
@@ -27,19 +44,36 @@ async def run_scheduled_ingest() -> None:
             generate_briefing=settings.scheduler_generate_briefing,
         )
         db.commit()
+        _last_scheduler_run_at = run.finished_at
+        _last_scheduler_error = None
         logger.info(
-            "Scheduled ingest complete: status=%s fetched=%d created=%d updated=%d deactivated=%d",
-            run.status,
-            run.alerts_fetched,
-            run.alerts_created,
-            run.alerts_updated,
-            run.alerts_deactivated,
+            "Scheduled ingest complete",
+            extra={
+                "status": run.status,
+                "fetched": run.alerts_fetched,
+                "created": run.alerts_created,
+                "updated": run.alerts_updated,
+                "deactivated": run.alerts_deactivated,
+            },
         )
         if run.errors:
             for err in run.errors:
-                logger.warning("Scheduled ingest source error: %s", err)
-    except Exception:
+                logger.error(
+                    "Scheduled ingest source error",
+                    extra={"source": err.get("source"), "status": "error"},
+                )
+                logger.error("Scheduled ingest source error: %s", err)
+        if run.status == "failed":
+            _last_scheduler_error = (
+                run.errors[0].get("error") if run.errors else "all sources failed"
+            )
+            logger.error(
+                "Scheduled ingest failed",
+                extra={"status": run.status, "source": run.source},
+            )
+    except Exception as exc:
         db.rollback()
+        _last_scheduler_error = str(exc)
         logger.exception("Scheduled ingest failed")
     finally:
         db.close()

@@ -52,6 +52,10 @@ export function sourceLabel(source: AlertSource): string {
   return SOURCE_LABELS[source] ?? source;
 }
 
+export function ingestModeLabel(mode: "live" | "fixture" | undefined): string {
+  return mode === "fixture" ? "Demo" : "Live";
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {

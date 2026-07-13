@@ -281,3 +281,53 @@ async def test_live_nina_ingest_deactivates_stale_fixture_alerts(db_session, mon
     assert run.alerts_deactivated >= 1
     assert stale_fixture.is_active is False
 
+
+@pytest.mark.asyncio
+async def test_deactivate_fixture_alerts_on_ingest(db_session, monkeypatch) -> None:
+    """Pre-ingest cleanup must deactivate fixture alerts when DEMO_MODE=false."""
+    from app.core.config import get_settings
+    from app.sources.gdacs import GdacsSourceAdapter
+
+    monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.setenv("NINA_FALLBACK_TO_FIXTURES", "false")
+    get_settings.cache_clear()
+
+    now = utc_now()
+    fixture = Alert(
+        source="gdacs",
+        source_alert_id="DEMO-GDACS-001",
+        title="Demo GDACS event",
+        category="earthquake",
+        severity="moderate",
+        status="actual",
+        issued_at=now,
+        expires_at=now + timedelta(hours=24),
+        ingested_at=now,
+        last_seen_at=now,
+        raw_payload={"_ingest_mode": "fixture"},
+        fingerprint=generate_fingerprint(
+            source="gdacs",
+            source_alert_id="DEMO-GDACS-001",
+            title="Demo GDACS event",
+            issued_at=now,
+            severity="moderate",
+            category="earthquake",
+        ),
+        is_active=True,
+    )
+    db_session.add(fixture)
+    db_session.commit()
+
+    async def empty_live(self):
+        self._last_ingest_mode = "live"
+        return []
+
+    monkeypatch.setattr(GdacsSourceAdapter, "fetch_alerts", empty_live)
+
+    run = await run_ingest(db_session, sources=["gdacs"])
+    db_session.commit()
+    db_session.refresh(fixture)
+
+    assert run.alerts_deactivated >= 1
+    assert fixture.is_active is False
+

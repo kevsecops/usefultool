@@ -5,7 +5,7 @@ import maplibregl from "maplibre-gl";
 import Supercluster from "supercluster";
 import Link from "next/link";
 import type { Alert, Severity } from "@/types/alert";
-import { severityColor, severityLabel, sourceLabel } from "@/lib/format";
+import { severityColor, severityLabel, sourceLabel, ingestModeLabel } from "@/lib/format";
 import { sanitizeToPlainText } from "@/lib/sanitize";
 
 interface AlertMapProps {
@@ -381,6 +381,15 @@ export function AlertMap({ alerts }: AlertMapProps) {
             </span>
             <span className="text-xs text-slate-500">
               {sourceLabel(selectedAlert.source)}
+            </span>
+            <span
+              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                selectedAlert.ingest_mode === "fixture"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}
+            >
+              {ingestModeLabel(selectedAlert.ingest_mode)}
             </span>
           </div>
           <h3 className="pr-6 font-semibold text-slate-900">

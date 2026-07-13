@@ -193,18 +193,19 @@ cd backend && pytest -v
 | `SCHEDULER_GENERATE_BRIEFING` | `true` | Briefing nach jedem geplanten Ingest neu generieren |
 | `SCHEDULER_STARTUP_DELAY_SECONDS` | `30` | Wartezeit nach Container-Start bis erster Ingest |
 | `LOG_LEVEL` | `INFO` | Log-Level |
+| `LOG_FORMAT` | `json` | `json` (structured) oder `text` (lesbar) |
 
 Vollständige Liste: [.env.example](.env.example)
 
 ## Automatischer Daten-Refresh
 
-**Standard:** Kein automatischer Ingest — Daten werden manuell oder per externem Scheduler aktualisiert.
+**Standard in Docker Compose:** Der eingebaute Backend-Scheduler (`SCHEDULER_ENABLED=true`) führt alle 15 Minuten Ingest und Briefing aus. **n8n ist nicht erforderlich**, wenn der Scheduler aktiv ist — siehe [docs/n8n-integration.md](docs/n8n-integration.md).
 
 | Methode | Wann nutzen |
 |---------|-------------|
-| **Backend-Scheduler** (`SCHEDULER_ENABLED=true`) | Container-only Deployment ohne cron/n8n |
-| **cron / systemd timer** | Host mit Docker Compose |
-| **n8n** | Workflow-basiert, siehe [docs/n8n-integration.md](docs/n8n-integration.md) |
+| **Backend-Scheduler** (`SCHEDULER_ENABLED=true`) | **MVP-Standard** — Container-Deployment ohne externe Tools |
+| **cron / systemd timer** | Host mit Docker Compose, Scheduler deaktiviert |
+| **n8n** (optional) | Externe Orchestrierung, Benachrichtigungen, Custom-Workflows |
 
 ### Eingebauter Scheduler (Docker)
 
@@ -225,9 +226,17 @@ docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
 
 ## Demo-Modus
 
-`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs. **Docker Compose setzt `DEMO_MODE=true` standardmäßig** für die lokale Demo.
+`DEMO_MODE=true` aktiviert Fixture-basierte Daten aus `fixtures/` — funktioniert offline, ohne externe APIs.
 
-Für **echte Live-Daten** (warnung.bund.de, GDACS, NOAA):
+**Docker Compose setzt `DEMO_MODE=false` standardmäßig** für Live-Daten (NINA, GDACS, NOAA). Fixture-Alerts aus früheren Demo-Ingests werden beim Backend-Start und vor jedem Live-Ingest deaktiviert und aus der öffentlichen API ausgeblendet.
+
+Für **offline Demo**:
+
+```env
+DEMO_MODE=true
+```
+
+Für **echte Live-Daten**:
 
 ```env
 DEMO_MODE=false
@@ -235,9 +244,21 @@ NINA_FALLBACK_TO_FIXTURES=false
 SOURCES_LIVE=nina,gdacs,noaa
 ```
 
-Dann `docker compose up -d --build` und manuell oder per Scheduler ingest ausführen. Demo-Fixture-Alerts werden beim ersten Live-Ingest deaktiviert.
+Dann `docker compose up -d --build`. Die Karte und das Dashboard zeigen nur Live-Warnungen; Demo-Fixtures erhalten ein **Demo**-Badge, wenn `DEMO_MODE=true`.
 
-`GET /api/v1/sources` zeigt `ingest_mode` (`fixture` / `live`) und `alerts_fetched` pro Quelle.
+`GET /api/v1/sources` zeigt `ingest_mode` (`fixture` / `live`) pro Quelle.
+
+### Monitoring
+
+| Endpoint | Beschreibung |
+|----------|--------------|
+| `GET /health` | Öffentlich — Scheduler-Status, letzter Ingest, Alert-Zähler, `demo_mode` |
+| `GET /api/v1/admin/status` | Admin-Token — Ingest-Historie, Quellen-Fehler, Scheduler-Details |
+
+```bash
+curl http://localhost:8000/health
+curl -H "X-Admin-Token: $ADMIN_TOKEN" http://localhost:8000/api/v1/admin/status
+```
 
 ### LLM aktivieren (optional)
 
@@ -276,8 +297,9 @@ docker compose exec backend python -m app.jobs.cli generate-briefing --type llm
 | [docs/noaa-mapping.md](docs/noaa-mapping.md) | NOAA/NWS → kanonisches Mapping |
 | [docs/nina-mapping.md](docs/nina-mapping.md) | NINA/BBK → kanonisches Mapping |
 | [docs/gdacs-mapping.md](docs/gdacs-mapping.md) | GDACS → kanonisches Mapping |
-| [docs/deployment.md](docs/deployment.md) | Docker Compose & Traefik |
-| [docs/n8n-integration.md](docs/n8n-integration.md) | n8n Scheduled Ingest |
+| [docs/deployment.md](docs/deployment.md) | Docker Compose Deployment |
+| [docs/n8n-integration.md](docs/n8n-integration.md) | Optionale n8n-Integration |
+| [docs/consistency-audit.md](docs/consistency-audit.md) | Plattform-Konsistenz-Audit |
 | [docs/llm-analysis.md](docs/llm-analysis.md) | LLM als Kern-Analyseschicht |
 | [docs/risk-scoring.md](docs/risk-scoring.md) | Risk-Score-Algorithmus |
 | [docs/security.md](docs/security.md) | Threat Model & Maßnahmen |

@@ -3,15 +3,17 @@
 from uuid import UUID
 
 from geoalchemy2.functions import ST_Intersects, ST_MakeEnvelope
-from sqlalchemy import func, inspect, or_, select
+from sqlalchemy import func, inspect, not_, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.alert import Alert
 from app.normalization.bounding_box import BoundingBoxError, parse_bounding_box
 from app.normalization.datetime_utils import utc_now
 from app.normalization.geometry import wkt_element_to_geojson
 from app.schemas.alert import AlertQueryParams, AlertResponse
 from app.services.alert_active import is_effectively_active
+from app.services.alert_fixture import extract_ingest_mode, fixture_alert_filter
 
 
 def _alert_to_response(alert: Alert, include_raw: bool = False) -> AlertResponse:
@@ -20,14 +22,21 @@ def _alert_to_response(alert: Alert, include_raw: bool = False) -> AlertResponse
     fields.pop("geometry", None)
     fields["geometry"] = geometry
     fields["is_active"] = is_effectively_active(alert)
+    fields["ingest_mode"] = extract_ingest_mode(alert)
     if not include_raw:
         fields["raw_payload"] = None
     return AlertResponse.model_validate(fields)
 
 
 def list_alerts(db: Session, params: AlertQueryParams) -> tuple[list[AlertResponse], int]:
+    settings = get_settings()
     query = select(Alert)
     count_query = select(func.count()).select_from(Alert)
+
+    if not settings.demo_mode:
+        hide_fixtures = not_(fixture_alert_filter())
+        query = query.where(hide_fixtures)
+        count_query = count_query.where(hide_fixtures)
 
     if params.active is not None:
         query = query.where(Alert.is_active == params.active)
@@ -78,5 +87,7 @@ def list_alerts(db: Session, params: AlertQueryParams) -> tuple[list[AlertRespon
 def get_alert(db: Session, alert_id: UUID, include_raw: bool = False) -> AlertResponse | None:
     alert = db.get(Alert, alert_id)
     if not alert:
+        return None
+    if not get_settings().demo_mode and extract_ingest_mode(alert) == "fixture":
         return None
     return _alert_to_response(alert, include_raw=include_raw)

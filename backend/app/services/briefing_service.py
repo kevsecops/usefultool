@@ -20,6 +20,7 @@ from app.models.briefing import Briefing
 from app.normalization.datetime_utils import utc_now
 from app.schemas.common import BriefingType
 from app.services.alert_active import filter_effectively_active
+from app.services.alert_fixture import is_fixture_alert
 
 logger = get_logger(__name__)
 
@@ -194,9 +195,13 @@ def _collect_analysis_context(db: Session, alerts: list[Alert], now):
 
 
 def _load_active_alerts(db: Session) -> list[Alert]:
+    settings = get_settings()
     now = utc_now()
     db_alerts = db.scalars(select(Alert).where(Alert.is_active.is_(True))).all()
-    return filter_effectively_active(db_alerts, now=now)
+    alerts = filter_effectively_active(db_alerts, now=now)
+    if not settings.demo_mode:
+        alerts = [alert for alert in alerts if not is_fixture_alert(alert)]
+    return alerts
 
 
 def _generate_llm_briefing(db: Session) -> Briefing:
