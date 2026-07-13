@@ -185,9 +185,40 @@ cd backend && pytest -v
 | `GDACS_BASE_URL` | `https://www.gdacs.org` | GDACS API base URL |
 | `GDACS_USE_FIXTURES` | `false` | GDACS-Fixtures erzwingen |
 | `GDACS_FALLBACK_TO_FIXTURES` | `true` | Bei Live-Fehler auf GDACS-Fixtures zurückfallen |
+| `SCHEDULER_ENABLED` | `false` | Hintergrund-Ingest im Backend-Container aktivieren |
+| `INGEST_INTERVAL_MINUTES` | `15` | Intervall für automatischen Ingest (wenn Scheduler aktiv) |
+| `SCHEDULER_GENERATE_BRIEFING` | `true` | Briefing nach jedem geplanten Ingest neu generieren |
+| `SCHEDULER_STARTUP_DELAY_SECONDS` | `30` | Wartezeit nach Container-Start bis erster Ingest |
 | `LOG_LEVEL` | `INFO` | Log-Level |
 
 Vollständige Liste: [.env.example](.env.example)
+
+## Automatischer Daten-Refresh
+
+**Standard:** Kein automatischer Ingest — Daten werden manuell oder per externem Scheduler aktualisiert.
+
+| Methode | Wann nutzen |
+|---------|-------------|
+| **Backend-Scheduler** (`SCHEDULER_ENABLED=true`) | Container-only Deployment ohne cron/n8n |
+| **cron / systemd timer** | Host mit Docker Compose |
+| **n8n** | Workflow-basiert, siehe [docs/n8n-integration.md](docs/n8n-integration.md) |
+
+### Eingebauter Scheduler (Docker)
+
+```env
+SCHEDULER_ENABLED=true
+INGEST_INTERVAL_MINUTES=15
+SCHEDULER_GENERATE_BRIEFING=true
+```
+
+Der Scheduler startet im Backend-Container mit Uvicorn, führt nach 30s Startup-Delay den ersten Ingest aus und wiederholt alle `INGEST_INTERVAL_MINUTES` Minuten. Empfohlene Mindestintervalle pro Quelle: [docs/data-sources.md](docs/data-sources.md#ingest-polling-empfehlung-phase-7).
+
+Manuell (weiterhin möglich):
+
+```bash
+docker compose exec backend python -m app.jobs.cli ingest
+docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
+```
 
 ## Demo-Modus
 

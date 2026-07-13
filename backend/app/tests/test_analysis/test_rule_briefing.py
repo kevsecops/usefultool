@@ -76,6 +76,68 @@ def test_briefing_implications_conservative_language() -> None:
     assert any("Mögliche" in s or "Potenzielle" in s for s in logistics)
 
 
+def test_briefing_multi_source_breakdown() -> None:
+    """Briefing must reflect all live sources with per-source counts and countries."""
+    alerts = [
+        _make_alert(
+            source="nina",
+            source_alert_id="nina-1",
+            fingerprint="fp-nina",
+            title="Hochwasserwarnung Saarland",
+            country_code="DE",
+            region="Saarland",
+            category="flood",
+        ),
+        _make_alert(
+            source="gdacs",
+            source_alert_id="gdacs-1",
+            fingerprint="fp-gdacs",
+            title="Earthquake in Papua New Guinea",
+            country_code="PG",
+            region="Papua New Guinea",
+            category="earthquake",
+            severity="moderate",
+        ),
+        _make_alert(
+            source="noaa",
+            source_alert_id="noaa-1",
+            fingerprint="fp-noaa",
+            title="Flood Advisory in Travis County",
+            country_code="US",
+            region="Texas",
+            category="flood",
+        ),
+        _make_alert(
+            source="noaa",
+            source_alert_id="noaa-2",
+            fingerprint="fp-noaa-2",
+            title="Severe Thunderstorm Warning",
+            country_code="US",
+            region="Oklahoma",
+            category="weather",
+            severity="extreme",
+        ),
+    ]
+    risk = compute_global_risk_score(alerts, cluster_bonuses=[], rolling_avg_active=4)
+    briefing = generate_rule_briefing(alerts, risk=risk, hotspots=[])
+
+    assert len(briefing["by_source"]) == 3
+    by_source = {item["source"]: item for item in briefing["by_source"]}
+    assert by_source["nina"]["count"] == 1
+    assert by_source["gdacs"]["count"] == 1
+    assert by_source["noaa"]["count"] == 2
+    assert by_source["nina"]["label"] == "NINA/BBK"
+    assert "NINA/BBK" in briefing["summary"]
+    assert "GDACS" in briefing["summary"]
+    assert "NOAA/NWS" in briefing["summary"]
+    assert any(item["code"] == "US" and item["count"] == 2 for item in briefing["top_countries"])
+    assert any(item["code"] == "DE" for item in briefing["top_countries"])
+    assert len(briefing["source_alert_ids"]) == 4
+    sources_in_events = {event["source"] for event in briefing["major_events"]}
+    assert sources_in_events <= {"nina", "gdacs", "noaa"}
+    assert any("NINA/BBK" in lim for lim in briefing["limitations"])
+
+
 def test_briefing_implications_wildfire_uses_schema_domains() -> None:
     """Wildfire alerts must not emit non-schema implication keys (e.g. environmental)."""
     alerts = [

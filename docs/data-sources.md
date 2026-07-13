@@ -382,8 +382,14 @@ Deployment und Scheduling: [docs/deployment.md](deployment.md), [docs/n8n-integr
 
 ## Ingest-Polling-Empfehlung (Phase 7)
 
-| Quelle | Intervall | Begründung |
-|--------|-----------|------------|
-| NOAA | 60s | Cache max-age=5, Rate-Limit-Vorsicht |
-| NINA | 120s | Cache max-age=10, Detail-Fetches |
+| Quelle | Mindestintervall | Begründung |
+|--------|------------------|------------|
+| NOAA | 30–60s | Cache max-age=5, Rate-Limit-Vorsicht |
+| NINA | 60–120s | Cache max-age=10, Detail-Fetches |
 | GDACS | 300s | Langsamere Event-Entwicklung |
+
+**Gesamt-Ingest (alle Quellen):** Mindestens **15 Minuten** empfohlen (`INGEST_INTERVAL_MINUTES=15`). Schnellere Intervalle nur mit quellenspezifischem Scheduling (z. B. n8n) und unter Beachtung der Limits oben.
+
+Automatisierung:
+- **Eingebaut:** `SCHEDULER_ENABLED=true` im Backend-Container ([docs/deployment.md](deployment.md))
+- **Extern:** cron, systemd, n8n ([docs/n8n-integration.md](n8n-integration.md))

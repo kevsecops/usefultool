@@ -21,12 +21,14 @@ def get_stats(db: Session) -> StatsResponse:
     by_country: Counter[str] = Counter()
     by_category: Counter[str] = Counter()
     by_severity: Counter[str] = Counter()
+    by_source: Counter[str] = Counter()
 
     for alert in active_alerts:
         if alert.country_code:
             by_country[alert.country_code] += 1
         by_category[alert.category] += 1
         by_severity[alert.severity] += 1
+        by_source[alert.source] += 1
 
     hotspots = detect_hotspots(active_alerts)
     cluster_bonuses = clusters_to_bonus_details(hotspots)
@@ -62,6 +64,7 @@ def get_stats(db: Session) -> StatsResponse:
         by_country=dict(by_country),
         by_category=dict(by_category),
         by_severity=dict(by_severity),
+        by_source=dict(by_source),
         top_countries=top_countries,
         hotspot_regions=hotspot_regions,
         trend_anomalies=[

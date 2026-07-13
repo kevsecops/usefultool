@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     risk_cluster_radius_km: int = 100
     risk_trend_window_days: int = 7
 
+    scheduler_enabled: bool = False
+    ingest_interval_minutes: int = 15
+    scheduler_generate_briefing: bool = True
+    scheduler_startup_delay_seconds: int = 30
+
 
 @lru_cache
 def get_settings() -> Settings:
