@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "warnId": "mow.DE-SL-SLS-W038-20260113-000"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [6.65, 49.30],
+            [6.85, 49.30],
+            [6.85, 49.45],
+            [6.65, 49.45],
+            [6.65, 49.30]
+          ]
+        ]
+      }
+    }
+  ]
+}

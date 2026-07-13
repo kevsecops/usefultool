@@ -1,0 +1,82 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [148.52, -3.22]
+      },
+      "properties": {
+        "eventtype": "EQ",
+        "eventid": 1551590,
+        "episodeid": 1717883,
+        "name": "Earthquake in Papua New Guinea",
+        "alertlevel": "Orange",
+        "alertscore": 2.5,
+        "severitydata": {
+          "severity": 6.4,
+          "severitytext": "Magnitude 6.4M",
+          "severityunit": "M"
+        },
+        "country": "Papua New Guinea",
+        "iso3": "PNG",
+        "fromdate": "2026-07-13T08:53:27",
+        "todate": "2026-07-20T08:53:27",
+        "datemodified": "2026-07-13T09:00:00",
+        "iscurrent": "true",
+        "description": "Magnitude 6.4 earthquake detected near Papua New Guinea coast.",
+        "url": {
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=EQ&eventid=1551590",
+          "report": "https://www.gdacs.org/report.aspx?eventid=1551590"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-85.0, 18.5]
+      },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1551600,
+        "episodeid": 1717900,
+        "name": "Tropical Cyclone in Caribbean Sea",
+        "alertlevel": "Red",
+        "alertscore": 3.5,
+        "country": "Honduras",
+        "iso3": "HND",
+        "fromdate": "2026-07-12T10:00:00",
+        "iscurrent": "true",
+        "description": "Category 3 tropical cyclone approaching Caribbean coast.",
+        "url": {
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=TC&eventid=1551600"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [110.5, -7.5]
+      },
+      "properties": {
+        "eventtype": "VO",
+        "eventid": 1551610,
+        "episodeid": 1717910,
+        "name": "Volcanic activity in Indonesia",
+        "alertlevel": "Green",
+        "alertscore": 1.0,
+        "country": "Indonesia",
+        "iso3": "IDN",
+        "fromdate": "2026-07-11T06:00:00",
+        "iscurrent": "true",
+        "description": "Increased volcanic activity observed at Merapi.",
+        "url": {
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=VO&eventid=1551610"
+        }
+      }
+    }
+  ]
+}
