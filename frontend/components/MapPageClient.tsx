@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Alert, AlertFilters } from "@/types/alert";
-import { Filters, filtersFromSearchParams } from "@/components/Filters";
+import { Filters } from "@/components/Filters";
+import { filtersFromSearchParams } from "@/lib/filters";
 import { AlertMap } from "@/components/AlertMap";
 
 const API_URL =
@@ -16,7 +17,6 @@ function buildQuery(filters: AlertFilters): string {
   if (filters.category) params.set("category", filters.category);
   if (filters.severity) params.set("severity", filters.severity);
   params.set("active", String(filters.active ?? true));
-  if (filters.bounding_box) params.set("bounding_box", filters.bounding_box);
   params.set("limit", "200");
   const qs = params.toString();
   return qs ? `?${qs}` : "";
@@ -27,7 +27,6 @@ function MapContent() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bbox, setBbox] = useState<string | undefined>();
 
   const filterKey = searchParams.toString();
 
@@ -41,12 +40,10 @@ function MapContent() {
         Object.fromEntries(searchParams.entries()),
         { limit: 200 },
       );
-      const queryFilters: AlertFilters = { ...filters, limit: 200 };
-      if (bbox) queryFilters.bounding_box = bbox;
 
       try {
         const res = await fetch(
-          `${API_URL}/api/v1/alerts${buildQuery(queryFilters)}`,
+          `${API_URL}/api/v1/alerts${buildQuery({ ...filters, limit: 200 })}`,
         );
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data = await res.json();
@@ -65,7 +62,7 @@ function MapContent() {
     return () => {
       cancelled = true;
     };
-  }, [filterKey, bbox, searchParams]);
+  }, [filterKey, searchParams]);
 
   return (
     <div className="space-y-4">
@@ -80,9 +77,7 @@ function MapContent() {
           {error}
         </div>
       )}
-      {!loading && !error && (
-        <AlertMap alerts={alerts} onBoundsChange={setBbox} />
-      )}
+      <AlertMap alerts={alerts} />
     </div>
   );
 }

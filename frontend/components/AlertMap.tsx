@@ -10,8 +10,6 @@ import { sanitizeToPlainText } from "@/lib/sanitize";
 
 interface AlertMapProps {
   alerts: Alert[];
-  height?: string;
-  onBoundsChange?: (bbox: string) => void;
 }
 
 interface AlertFeatureProperties {
@@ -70,17 +68,14 @@ function polygonFeatures(alerts: Alert[]): GeoJSON.Feature[] {
     }));
 }
 
-export function AlertMap({
-  alerts,
-  height = "calc(100vh - 280px)",
-  onBoundsChange,
-}: AlertMapProps) {
+export function AlertMap({ alerts }: AlertMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const clusterRef = useRef<Supercluster | null>(null);
   const alertsRef = useRef(alerts);
+  const initializedRef = useRef(false);
+  const initialFitDoneRef = useRef(false);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
-  const boundsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   alertsRef.current = alerts;
 
@@ -104,17 +99,47 @@ export function AlertMap({
     source.setData({ type: "FeatureCollection", features: clusters });
   }, []);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const updateAlertData = useCallback(
+    (map: maplibregl.Map, nextAlerts: Alert[]) => {
+      const cluster = clusterRef.current;
+      if (!cluster) return;
 
-    const points = alerts.map(alertToPoint).filter(Boolean) as AlertFeature[];
-    const polygons = polygonFeatures(alerts);
+      const points = nextAlerts.map(alertToPoint).filter(Boolean) as AlertFeature[];
+      const polygons = polygonFeatures(nextAlerts);
+      cluster.load(points);
+
+      const polygonSource = map.getSource(
+        "alerts-polygons",
+      ) as maplibregl.GeoJSONSource;
+      if (polygonSource) {
+        polygonSource.setData({
+          type: "FeatureCollection",
+          features: polygons,
+        });
+      }
+
+      updateClusters(map);
+
+      if (!initialFitDoneRef.current && points.length > 0) {
+        const bounds = new maplibregl.LngLatBounds();
+        points.forEach((p) => {
+          bounds.extend(p.geometry.coordinates as [number, number]);
+        });
+        map.fitBounds(bounds, { padding: 60, maxZoom: 8 });
+        initialFitDoneRef.current = true;
+      }
+    },
+    [updateClusters],
+  );
+
+  useEffect(() => {
+    if (!containerRef.current || initializedRef.current) return;
+    initializedRef.current = true;
 
     const cluster = new Supercluster<AlertFeatureProperties>({
       radius: 50,
       maxZoom: 14,
     });
-    cluster.load(points);
     clusterRef.current = cluster;
 
     const map = new maplibregl.Map({
@@ -129,9 +154,7 @@ export function AlertMap({
             attribution: "© OpenStreetMap contributors",
           },
         },
-        layers: [
-          { id: "osm", type: "raster", source: "osm" },
-        ],
+        layers: [{ id: "osm", type: "raster", source: "osm" }],
       },
       center: [10, 30],
       zoom: 2,
@@ -148,7 +171,7 @@ export function AlertMap({
 
       map.addSource("alerts-polygons", {
         type: "geojson",
-        data: { type: "FeatureCollection", features: polygons },
+        data: { type: "FeatureCollection", features: [] },
       });
 
       map.addLayer({
@@ -253,28 +276,11 @@ export function AlertMap({
         },
       });
 
-      updateClusters(map);
-
-      if (points.length > 0) {
-        const bounds = new maplibregl.LngLatBounds();
-        points.forEach((p) => {
-          bounds.extend(p.geometry.coordinates as [number, number]);
-        });
-        map.fitBounds(bounds, { padding: 60, maxZoom: 8 });
-      }
+      updateAlertData(map, alertsRef.current);
     });
 
     map.on("moveend", () => {
       updateClusters(map);
-      if (onBoundsChange) {
-        if (boundsTimeoutRef.current) clearTimeout(boundsTimeoutRef.current);
-        boundsTimeoutRef.current = setTimeout(() => {
-          const b = map.getBounds();
-          onBoundsChange(
-            `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
-          );
-        }, 500);
-      }
     });
 
     const handleClick = (
@@ -288,10 +294,10 @@ export function AlertMap({
       const props = feature.properties as AlertFeatureProperties;
 
       if (props.cluster && props.cluster_id != null) {
-        const cluster = clusterRef.current;
-        if (!cluster) return;
+        const clusterInstance = clusterRef.current;
+        if (!clusterInstance) return;
         const expansionZoom = Math.min(
-          cluster.getClusterExpansionZoom(props.cluster_id),
+          clusterInstance.getClusterExpansionZoom(props.cluster_id),
           20,
         );
         map.easeTo({
@@ -312,61 +318,46 @@ export function AlertMap({
     map.on("click", "alert-points", handleClick);
     map.on("click", "alert-polygons-fill", handleClick);
 
-    map.on("mouseenter", "alert-clusters", () => {
+    const setPointer = () => {
       map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "alert-clusters", () => {
+    };
+    const clearPointer = () => {
       map.getCanvas().style.cursor = "";
+    };
+
+    map.on("mouseenter", "alert-clusters", setPointer);
+    map.on("mouseleave", "alert-clusters", clearPointer);
+    map.on("mouseenter", "alert-points", setPointer);
+    map.on("mouseleave", "alert-points", clearPointer);
+    map.on("mouseenter", "alert-polygons-fill", setPointer);
+    map.on("mouseleave", "alert-polygons-fill", clearPointer);
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
     });
-    map.on("mouseenter", "alert-points", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "alert-points", () => {
-      map.getCanvas().style.cursor = "";
-    });
-    map.on("mouseenter", "alert-polygons-fill", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "alert-polygons-fill", () => {
-      map.getCanvas().style.cursor = "";
-    });
+    resizeObserver.observe(containerRef.current);
 
     return () => {
-      if (boundsTimeoutRef.current) clearTimeout(boundsTimeoutRef.current);
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       clusterRef.current = null;
+      initializedRef.current = false;
+      initialFitDoneRef.current = false;
     };
-  }, [alerts, onBoundsChange, updateClusters]);
+  }, [updateAlertData, updateClusters]);
 
   useEffect(() => {
     const map = mapRef.current;
-    const cluster = clusterRef.current;
-    if (!map || !cluster || !map.isStyleLoaded()) return;
-
-    const points = alerts.map(alertToPoint).filter(Boolean) as AlertFeature[];
-    const polygons = polygonFeatures(alerts);
-    cluster.load(points);
-
-    const polygonSource = map.getSource(
-      "alerts-polygons",
-    ) as maplibregl.GeoJSONSource;
-    if (polygonSource) {
-      polygonSource.setData({
-        type: "FeatureCollection",
-        features: polygons,
-      });
-    }
-
-    updateClusters(map);
-  }, [alerts, updateClusters]);
+    if (!map || !map.isStyleLoaded()) return;
+    updateAlertData(map, alerts);
+  }, [alerts, updateAlertData]);
 
   return (
     <div className="relative">
       <div
         ref={containerRef}
-        style={{ height, minHeight: "400px" }}
-        className="w-full rounded-lg border border-slate-200"
+        className="h-[calc(100vh-12rem)] min-h-[600px] w-full rounded-lg border border-slate-200"
       />
 
       {selectedAlert && (
