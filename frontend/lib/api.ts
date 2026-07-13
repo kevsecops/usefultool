@@ -2,6 +2,7 @@ import type { AlertFilters, AlertListResponse } from "@/types/alert";
 import type { Stats } from "@/types/stats";
 import type { SourcesResponse } from "@/types/source";
 import type { Alert } from "@/types/alert";
+import type { Briefing, BriefingListResponse } from "@/types/briefing";
 
 export class ApiError extends Error {
   constructor(
@@ -90,4 +91,15 @@ export async function getStats(): Promise<Stats> {
 
 export async function getSources(): Promise<SourcesResponse> {
   return apiFetch("/api/v1/sources");
+}
+
+export async function getLatestBriefing(): Promise<Briefing> {
+  return apiFetch("/api/v1/briefings/latest");
+}
+
+export async function getBriefings(
+  limit = 20,
+  offset = 0,
+): Promise<BriefingListResponse> {
+  return apiFetch(`/api/v1/briefings?limit=${limit}&offset=${offset}`);
 }

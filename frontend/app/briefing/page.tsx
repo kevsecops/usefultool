@@ -1,10 +1,17 @@
-import { getStats } from "@/lib/api";
+import { getLatestBriefing, getStats } from "@/lib/api";
 import { BriefingView } from "@/components/BriefingView";
 
 export const dynamic = "force-dynamic";
 
 export default async function BriefingPage() {
   const stats = await getStats();
+
+  let briefing = null;
+  try {
+    briefing = await getLatestBriefing();
+  } catch {
+    // No briefing generated yet — BriefingView shows fallback
+  }
 
   return (
     <div className="space-y-6">
@@ -14,7 +21,7 @@ export default async function BriefingPage() {
           Globale Risikoanalyse und Zusammenfassung.
         </p>
       </div>
-      <BriefingView stats={stats} />
+      <BriefingView briefing={briefing} stats={stats} />
     </div>
   );
 }

@@ -112,6 +112,8 @@ def _update_alert(existing: Alert, canonical: CanonicalAlert, now: datetime) -> 
 async def run_ingest(
     db: Session,
     sources: list[str] | None = None,
+    *,
+    generate_briefing: bool = False,
 ) -> IngestRun:
     now = utc_now()
     source_label = "all" if not sources else ",".join(sources)
@@ -183,6 +185,12 @@ async def run_ingest(
 
     db.flush()
     db.refresh(run)
+
+    if generate_briefing and run.status in (IngestRunStatus.SUCCESS, IngestRunStatus.PARTIAL):
+        from app.services.briefing_service import generate_briefing as gen_briefing
+
+        gen_briefing(db, briefing_type="auto")
+
     return run
 
 
