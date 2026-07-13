@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgis/postgis:16-3.4
+    # Official image is amd64-only; explicit platform avoids arm64 host warnings
+    platform: linux/amd64
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -22,7 +24,10 @@ services:
       dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
+      # Compose values override .env (localhost URLs in .env are for non-Docker dev)
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/usefultool
       DEMO_MODE: "true"
       ADMIN_TOKEN: dev-admin-token
@@ -49,23 +54,22 @@ services:
         NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
+      # Browser calls the published API port on the host
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Next.js server components / SSR use the Docker network
       API_URL: http://backend:8000
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 40s
-    # Traefik labels (optional — uncomment when using Traefik reverse proxy):
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.gri-frontend.rule=Host(`dashboard.example.com`)"
-    #   - "traefik.http.services.gri-frontend.loadbalancer.server.port=3000"
 
 volumes:
   postgres_data:
