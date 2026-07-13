@@ -124,9 +124,10 @@ flowchart LR
 ### Infrastruktur (Phase 7)
 
 - DB nicht auf Host-Port exponieren (nur Docker-Netzwerk)
-- Traefik: TLS-Terminierung, optional IP-Whitelist für Admin
+- Traefik: TLS-Terminierung, optional IP-Whitelist für Admin — siehe [docs/deployment.md](deployment.md)
 - Healthchecks ohne sensitive Daten
 - Strukturierte Logs ohne Payload-Inhalte (nur IDs, Status)
+- SSRF-Allowlist aktiv: `warnung.bund.de`, `www.gdacs.org`, `api.weather.gov`
 
 ## Bekannte MVP-Limitierungen
 

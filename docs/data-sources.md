@@ -314,6 +314,21 @@ GlobalRiskIntelligence/1.0 (contact@example.com)
 
 Vollständige Mapping-Tabelle: [docs/noaa-mapping.md](noaa-mapping.md)
 
+### Live-Integration (Phase 7)
+
+| Quelle | Adapter | Status |
+|--------|---------|--------|
+| NOAA | `backend/app/sources/noaa.py` | ✅ Live + Fixtures |
+| NINA | `backend/app/sources/nina.py` | ✅ Live + Fixtures |
+| GDACS | `backend/app/sources/gdacs.py` | ✅ Live + Fixtures |
+
+Mapping-Dokumentation:
+- [docs/noaa-mapping.md](noaa-mapping.md)
+- [docs/nina-mapping.md](nina-mapping.md)
+- [docs/gdacs-mapping.md](gdacs-mapping.md)
+
+Deployment und Scheduling: [docs/deployment.md](deployment.md), [docs/n8n-integration.md](n8n-integration.md)
+
 ### Mapping-Notizen
 
 | Quellfeld | Kanonisch | Implementierung |

@@ -58,7 +58,12 @@ def test_mock_provider_returns_valid_briefing(db_session) -> None:
 
 
 @pytest.mark.asyncio
-async def test_auto_uses_llm_when_enabled(client, db_session) -> None:
+async def test_auto_uses_llm_when_enabled(client, db_session, monkeypatch) -> None:
+    monkeypatch.setenv("LLM_ENABLED", "true")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
     from app.services.ingest_service import run_ingest
 
     await run_ingest(db_session)
@@ -69,6 +74,8 @@ async def test_auto_uses_llm_when_enabled(client, db_session) -> None:
     response = client.get("/api/v1/briefings/latest")
     assert response.status_code == 200
     assert response.json()["type"] == "llm"
+
+    get_settings.cache_clear()
 
 
 def test_llm_disabled_uses_rule_based(db_session, monkeypatch) -> None:

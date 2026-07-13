@@ -28,11 +28,22 @@ class Settings(BaseSettings):
     noaa_max_retries: int = 3
     noaa_use_fixtures: bool = False
     noaa_fallback_to_fixtures: bool = True
-    sources_live: str = "noaa"
+    sources_live: str = "nina,gdacs,noaa"
+    nina_user_agent: str = "GlobalRiskIntelligence/1.0 (contact@example.com)"
     nina_base_url: str = "https://warnung.bund.de/api31"
+    nina_fetch_timeout_seconds: float = 10.0
+    nina_max_response_bytes: int = 10 * 1024 * 1024
+    nina_max_retries: int = 3
+    nina_use_fixtures: bool = False
+    nina_fallback_to_fixtures: bool = True
     gdacs_base_url: str = "https://www.gdacs.org"
+    gdacs_fetch_timeout_seconds: float = 15.0
+    gdacs_max_response_bytes: int = 10 * 1024 * 1024
+    gdacs_max_retries: int = 3
+    gdacs_use_fixtures: bool = False
+    gdacs_fallback_to_fixtures: bool = True
 
-    llm_enabled: bool = True
+    llm_enabled: bool = False
     llm_provider: str = "mock"
     llm_base_url: str = ""
     llm_api_key: str = ""

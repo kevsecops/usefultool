@@ -37,6 +37,8 @@ class HttpClient:
         self.max_response_bytes = max_response_bytes
         self.allowed_hosts = allowed_hosts or frozenset()
         self._transport = transport
+        self._etag_by_url: dict[str, str] = {}
+        self._cached_response_by_url: dict[str, Any] = {}
 
     def _validate_url(self, url: str) -> None:
         parsed = urlparse(url)
@@ -66,6 +68,14 @@ class HttpClient:
 
     async def get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         data, _ = await self._request_json(url, params=params)
+        if not isinstance(data, dict):
+            raise HttpClientError("Expected JSON object response")
+        return data
+
+    async def get_json_list(self, url: str, params: dict[str, Any] | None = None) -> list[Any]:
+        data, _ = await self._request_json(url, params=params)
+        if not isinstance(data, list):
+            raise HttpClientError("Expected JSON array response")
         return data
 
     async def get_json_paginated(self, url: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -89,6 +99,14 @@ class HttpClient:
         self._validate_url(url)
         last_error: Exception | None = None
 
+        headers = {
+            "User-Agent": self.user_agent,
+            "Accept": "application/geo+json, application/json",
+        }
+        cached_etag = self._etag_by_url.get(url)
+        if cached_etag:
+            headers["If-None-Match"] = cached_etag
+
         for attempt in range(self.max_retries + 1):
             try:
                 async with httpx.AsyncClient(
@@ -96,16 +114,15 @@ class HttpClient:
                     transport=self._transport,
                     follow_redirects=True,
                 ) as client:
-                    response = await client.get(
-                        url,
-                        params=params,
-                        headers={"User-Agent": self.user_agent, "Accept": "application/geo+json"},
-                    )
+                    response = await client.get(url, params=params, headers=headers)
 
                     if len(response.content) > self.max_response_bytes:
                         raise HttpClientError(
                             f"Response exceeds max size ({self.max_response_bytes} bytes)"
                         )
+
+                    if response.status_code == 304 and url in self._cached_response_by_url:
+                        return self._cached_response_by_url[url], response
 
                     if response.status_code in RETRYABLE_STATUS_CODES and attempt < self.max_retries:
                         delay = 2**attempt
@@ -123,8 +140,10 @@ class HttpClient:
                     response.raise_for_status()
 
                     data = response.json()
-                    if not isinstance(data, dict):
-                        raise HttpClientError("Expected JSON object response")
+                    etag = response.headers.get("etag")
+                    if etag:
+                        self._etag_by_url[url] = etag
+                        self._cached_response_by_url[url] = data
                     return data, response
 
             except httpx.TimeoutException as exc:

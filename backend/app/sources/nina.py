@@ -1,20 +1,20 @@
-"""NINA source adapter (MoWaS + DWD, fixture mode in Phase 2)."""
+"""NINA source adapter — live HTTP in Phase 7, fixtures in DEMO_MODE."""
 
-from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote, urlparse
 
 from app.core.config import get_settings
+from app.core.http_client import HttpClient, HttpClientError
 from app.core.logging import get_logger
-from app.normalization.category import normalize_nina_event_code
+from app.normalization.category import normalize_cap_category, normalize_nina_event_code
 from app.normalization.datetime_utils import parse_datetime, utc_now
-from app.normalization.fingerprint import generate_fingerprint
 from app.normalization.geometry import compute_centroid
 from app.normalization.html_sanitizer import sanitize_html
 from app.normalization.severity import normalize_cap_severity
 from app.schemas.alert import CanonicalAlert
 from app.schemas.common import AlertSource, AlertStatus, Category, Certainty, Urgency
 from app.sources.base import ParsedAlert, RawAlertPayload, SourceHealth
-from app.sources.fixture_loader import load_fixture, load_geojson
+from app.sources.fixture_loader import load_fixture, load_geojson, list_fixtures
 
 logger = get_logger(__name__)
 
@@ -39,17 +39,51 @@ _STATUS_MAP = {
     "draft": AlertStatus.DRAFT,
 }
 
+_MAP_FEEDS = ("mowas/mapData.json", "dwd/mapData.json")
+
+
+def _nina_allowed_hosts(base_url: str) -> frozenset[str]:
+    host = urlparse(base_url).hostname
+    return frozenset({host}) if host else frozenset()
+
+
+def extract_geometry_from_geojson(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract first feature geometry from NINA GeoJSON FeatureCollection."""
+    features = data.get("features", [])
+    if not features:
+        return None
+    first = features[0]
+    if isinstance(first, dict):
+        return first.get("geometry")
+    return None
+
 
 class NinaSourceAdapter:
     source_id = AlertSource.NINA
 
-    def __init__(self) -> None:
+    def __init__(self, http_client: HttpClient | None = None) -> None:
         self.settings = get_settings()
-        self._last_fetch: datetime | None = None
+        self._last_fetch = None
+        self._http = http_client or HttpClient(
+            user_agent=self.settings.nina_user_agent,
+            timeout_seconds=self.settings.nina_fetch_timeout_seconds,
+            max_retries=self.settings.nina_max_retries,
+            max_response_bytes=self.settings.nina_max_response_bytes,
+            allowed_hosts=_nina_allowed_hosts(self.settings.nina_base_url),
+        )
 
-    async def fetch_alerts(self) -> list[RawAlertPayload]:
+    def _use_fixtures(self) -> bool:
+        if self.settings.demo_mode or self.settings.nina_use_fixtures:
+            return True
+        live_sources = {s.strip().lower() for s in self.settings.sources_live.split(",") if s.strip()}
+        return "nina" not in live_sources
+
+    def _fixture_feeds(self) -> tuple[str, ...]:
+        return ("mapdata_mowas.json", "mapdata_dwd.json")
+
+    async def _fetch_from_fixtures(self) -> list[RawAlertPayload]:
         payloads: list[RawAlertPayload] = []
-        for feed in ("mapdata_mowas.json", "mapdata_dwd.json"):
+        for feed in self._fixture_feeds():
             try:
                 items = load_fixture("nina", feed)
             except FileNotFoundError:
@@ -59,8 +93,8 @@ class NinaSourceAdapter:
                 continue
             for item in items:
                 alert_id = item.get("id", "")
-                detail = self._load_detail(alert_id)
-                geometry = self._load_geometry(alert_id)
+                detail = self._load_detail_fixture(alert_id)
+                geometry = self._load_geometry_fixture(alert_id)
                 payloads.append(
                     RawAlertPayload(
                         source=self.source_id,
@@ -72,7 +106,7 @@ class NinaSourceAdapter:
         self._last_fetch = utc_now()
         return payloads
 
-    def _load_detail(self, alert_id: str) -> dict[str, Any] | None:
+    def _load_detail_fixture(self, alert_id: str) -> dict[str, Any] | None:
         safe_id = alert_id.replace(".", "_").replace("/", "_")
         try:
             return load_fixture("nina", f"warning_detail_{safe_id}.json")
@@ -82,23 +116,83 @@ class NinaSourceAdapter:
             except FileNotFoundError:
                 return None
 
-    def _load_geometry(self, alert_id: str) -> dict[str, Any] | None:
+    def _load_geometry_fixture(self, alert_id: str) -> dict[str, Any] | None:
         safe_id = alert_id.replace(".", "_").replace("/", "_")
-        try:
-            geo = load_geojson("nina", f"warning_geo_{safe_id}.geojson")
-            features = geo.get("features", [])
-            if features:
-                return features[0].get("geometry")
-            return None
-        except FileNotFoundError:
+        for name in (f"warning_geo_{safe_id}.geojson", "warning_geo_flood.geojson"):
             try:
-                geo = load_geojson("nina", "warning_geo_flood.geojson")
-                features = geo.get("features", [])
-                if features:
-                    return features[0].get("geometry")
+                geo = load_geojson("nina", name)
+                return extract_geometry_from_geojson(geo)
             except FileNotFoundError:
-                return None
+                continue
         return None
+
+    async def _fetch_live(self) -> list[RawAlertPayload]:
+        base = self.settings.nina_base_url.rstrip("/")
+        compact_items: list[dict[str, Any]] = []
+
+        for feed in _MAP_FEEDS:
+            try:
+                items = await self._http.get_json_list(f"{base}/{feed}")
+                compact_items.extend(item for item in items if isinstance(item, dict))
+            except HttpClientError as exc:
+                logger.warning("NINA mapData fetch failed for %s: %s", feed, exc)
+
+        payloads: list[RawAlertPayload] = []
+        for item in compact_items:
+            alert_id = item.get("id", "")
+            if not alert_id:
+                continue
+            detail = await self._fetch_warning_detail(base, alert_id)
+            geometry = await self._fetch_warning_geometry(base, alert_id)
+            payloads.append(
+                RawAlertPayload(
+                    source=self.source_id,
+                    data=item,
+                    detail=detail,
+                    geometry=geometry,
+                )
+            )
+
+        self._last_fetch = utc_now()
+        logger.info("NINA live fetch returned %d alerts", len(payloads))
+        return payloads
+
+    async def _fetch_warning_detail(self, base: str, alert_id: str) -> dict[str, Any] | None:
+        encoded_id = quote(alert_id, safe="")
+        try:
+            return await self._http.get_json(f"{base}/warnings/{encoded_id}.json")
+        except HttpClientError as exc:
+            logger.warning("NINA detail fetch failed for %s: %s", alert_id, exc)
+            return None
+
+    async def _fetch_warning_geometry(self, base: str, alert_id: str) -> dict[str, Any] | None:
+        encoded_id = quote(alert_id, safe="")
+        try:
+            geo = await self._http.get_json(f"{base}/warnings/{encoded_id}.geojson")
+            return extract_geometry_from_geojson(geo)
+        except HttpClientError as exc:
+            logger.warning("NINA geometry fetch failed for %s: %s", alert_id, exc)
+            return None
+
+    async def fetch_alerts(self) -> list[RawAlertPayload]:
+        if self._use_fixtures():
+            return await self._fetch_from_fixtures()
+
+        try:
+            payloads = await self._fetch_live()
+            if (
+                not payloads
+                and self.settings.nina_fallback_to_fixtures
+                and list_fixtures("nina", "mapdata_*.json")
+            ):
+                logger.warning("NINA live fetch returned no alerts, falling back to fixtures")
+                return await self._fetch_from_fixtures()
+            return payloads
+        except Exception as exc:
+            if self.settings.nina_fallback_to_fixtures and list_fixtures("nina", "mapdata_*.json"):
+                logger.warning("NINA live fetch failed (%s), falling back to fixtures", exc)
+                return await self._fetch_from_fixtures()
+            raise
 
     def parse_alert(self, raw: RawAlertPayload) -> ParsedAlert:
         detail = raw.detail or {}
@@ -130,8 +224,6 @@ class NinaSourceAdapter:
         if category == Category.OTHER and info.get("category"):
             cats = info.get("category", [])
             if isinstance(cats, list) and cats:
-                from app.normalization.category import normalize_cap_category
-
                 category = normalize_cap_category(cats[0])
 
         severity = normalize_cap_severity(info.get("severity") or compact.get("severity"))
@@ -148,7 +240,7 @@ class NinaSourceAdapter:
         return CanonicalAlert(
             source=AlertSource.NINA,
             source_alert_id=parsed.source_alert_id,
-            source_url=f"{self.settings.nina_base_url}/warnings/{parsed.source_alert_id}.json",
+            source_url=f"{self.settings.nina_base_url.rstrip('/')}/warnings/{parsed.source_alert_id}.json",
             title=title,
             description=sanitize_html(info.get("description")),
             instruction=sanitize_html(info.get("instruction")),
@@ -176,19 +268,43 @@ class NinaSourceAdapter:
 
     async def health_check(self) -> SourceHealth:
         now = utc_now()
-        try:
-            load_fixture("nina", "mapdata_mowas.json")
-            return SourceHealth(
-                source=self.source_id,
-                is_healthy=True,
-                checked_at=now,
-                latency_ms=1,
-                last_success_at=self._last_fetch or now,
-            )
-        except FileNotFoundError as exc:
+        if self._use_fixtures():
+            fixtures = list_fixtures("nina", "mapdata_*.json")
+            if fixtures:
+                return SourceHealth(
+                    source=self.source_id,
+                    is_healthy=True,
+                    checked_at=now,
+                    latency_ms=1,
+                    last_success_at=self._last_fetch or now,
+                )
             return SourceHealth(
                 source=self.source_id,
                 is_healthy=False,
                 checked_at=now,
+                error_message="No NINA fixtures found",
+            )
+
+        import time
+
+        start = time.monotonic()
+        try:
+            url = f"{self.settings.nina_base_url.rstrip('/')}/mowas/mapData.json"
+            await self._http.get_json_list(url)
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return SourceHealth(
+                source=self.source_id,
+                is_healthy=True,
+                checked_at=now,
+                latency_ms=latency_ms,
+                last_success_at=self._last_fetch or now,
+            )
+        except (HttpClientError, Exception) as exc:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return SourceHealth(
+                source=self.source_id,
+                is_healthy=False,
+                checked_at=now,
+                latency_ms=latency_ms,
                 error_message=str(exc),
             )
