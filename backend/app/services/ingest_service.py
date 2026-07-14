@@ -447,6 +447,11 @@ async def run_ingest(
 
             run_calculate_exposure(db, active_only=True)
 
+        if settings.implications_auto_run:
+            from app.services.implication_service import run_generate_implications
+
+            run_generate_implications(db, active_only=True)
+
     return run
 
 

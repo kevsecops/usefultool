@@ -270,6 +270,32 @@ Exposure link between a canonical event and an infrastructure asset.
 **API:** `GET /api/v1/events/{id}/exposures`, `GET /api/v1/exposure/analysis?event_id=`  
 **Admin:** `POST /api/v1/admin/calculate-exposure`
 
+## ImplicationCandidate (Phase 6)
+
+Rule-based assessment output linking canonical events to conservative impact hypotheses.
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|--------------|
+| `id` | UUID | ja | Primärschlüssel |
+| `canonical_event_id` | UUID FK | ja | `canonical_events.id` |
+| `category` | enum | ja | `logistics`, `economy`, `infrastructure`, `technology`, `energy`, `public_health`, `humanitarian`, `finance` |
+| `title` | string | ja | Kurztitel (konservative Hypothesen-Sprache) |
+| `description` | text | nein | Ausführliche Begründung |
+| `affected_region` | string | nein | Region/Land |
+| `related_asset_ids` | JSONB (UUID[]) | ja | Verknüpfte Exposure-Assets |
+| `supporting_source_ids` | JSONB | ja | Alert/Observed-Event-IDs |
+| `confidence` | enum | ja | `low`, `medium`, `high` |
+| `evidence_level` | enum | ja | `observed`, `officially_reported`, `inferred_from_exposure`, `hypothesis` |
+| `rationale` | text | nein | Regel-Audit-Trail |
+| `missing_data` | text | nein | Fehlende Daten für stärkere Aussagen |
+| `generated_by` | enum | ja | `rule_based` (MVP), `llm` (Phase 7) |
+| `created_at` | datetime | ja | |
+
+**API:** `GET /api/v1/events/{id}/implications`  
+**Admin:** `POST /api/v1/admin/generate-implications`  
+**CLI:** `python -m app.jobs.cli generate-implications`  
+**Doku:** [implications-engine.md](./implications-engine.md)
+
 ### SourceStatus (persistent)
 
 | Feld | Typ | Beschreibung |

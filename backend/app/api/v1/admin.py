@@ -9,9 +9,11 @@ from app.schemas.admin import IngestRequest, IngestResponse
 from app.schemas.briefing import GenerateBriefingRequest, GenerateBriefingResponse
 from app.schemas.canonical_event import CorrelateEventsResponse
 from app.schemas.exposure import CalculateExposureRequest, CalculateExposureResponse
+from app.schemas.implication import GenerateImplicationsRequest, GenerateImplicationsResponse
 from app.services.briefing_service import generate_briefing
 from app.services.correlation_service import run_correlation
 from app.services.exposure_service import run_calculate_exposure
+from app.services.implication_service import run_generate_implications
 from app.services.ingest_service import run_ingest
 from app.services.status_service import get_admin_status
 
@@ -84,6 +86,25 @@ def trigger_calculate_exposure(
 ) -> CalculateExposureResponse:
     req = request or CalculateExposureRequest()
     result = run_calculate_exposure(
+        db,
+        event_id=req.event_id,
+        active_only=req.active_only,
+    )
+    db.commit()
+    return result
+
+
+@router.post(
+    "/generate-implications",
+    response_model=GenerateImplicationsResponse,
+    dependencies=[Depends(verify_admin_token)],
+)
+def trigger_generate_implications(
+    request: GenerateImplicationsRequest | None = None,
+    db: Session = Depends(get_db),
+) -> GenerateImplicationsResponse:
+    req = request or GenerateImplicationsRequest()
+    result = run_generate_implications(
         db,
         event_id=req.event_id,
         active_only=req.active_only,

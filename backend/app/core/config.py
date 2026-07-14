@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     exposure_buffer_km: float = 50.0
     exposure_auto_run: bool = False
 
+    implications_auto_run: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

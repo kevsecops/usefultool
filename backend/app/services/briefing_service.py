@@ -241,12 +241,18 @@ def _generate_rule_based_briefing(db: Session) -> Briefing:
     now = utc_now()
     alerts = _load_active_alerts(db)
     hotspots, risk, anomalies = _collect_analysis_context(db, alerts, now)
+
+    from app.services.implication_service import list_active_implications
+
+    implications = list_active_implications(db)
+
     content = generate_rule_briefing(
         alerts,
         risk=risk,
         hotspots=hotspots,
         anomalies=anomalies,
         generated_at=now,
+        implication_candidates=implications,
     )
     content = _finalize_briefing_content(
         content, risk=risk, active_count=len(alerts), alerts=list(alerts)

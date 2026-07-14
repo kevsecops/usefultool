@@ -12,6 +12,7 @@ from app.db.session import SessionLocal
 from app.services.briefing_service import generate_briefing
 from app.services.correlation_service import run_correlation
 from app.services.exposure_service import import_exposure_fixtures, run_calculate_exposure
+from app.services.implication_service import run_generate_implications
 from app.services.ingest_service import run_ingest
 from app.sources.registry import get_adapters
 
@@ -102,6 +103,15 @@ async def cmd_correlate() -> int:
                 exp_result.exposures_created,
                 exp_result.exposures_updated,
             )
+        if settings.implications_auto_run:
+            impl_result = run_generate_implications(db, active_only=True)
+            db.commit()
+            logger.info(
+                "Implications auto-run: events=%d created=%d replaced=%d",
+                impl_result.events_processed,
+                impl_result.implications_created,
+                impl_result.implications_replaced,
+            )
         return 0
     finally:
         db.close()
@@ -124,6 +134,7 @@ async def cmd_import_exposure() -> int:
 
 
 async def cmd_calculate_exposure(event_id: str | None = None) -> int:
+    settings = get_settings()
     db = SessionLocal()
     try:
         from uuid import UUID
@@ -137,6 +148,35 @@ async def cmd_calculate_exposure(event_id: str | None = None) -> int:
             result.exposures_created,
             result.exposures_updated,
             result.analysis_version,
+        )
+        if settings.implications_auto_run:
+            impl_result = run_generate_implications(db, active_only=True)
+            db.commit()
+            logger.info(
+                "Implications auto-run: events=%d created=%d replaced=%d",
+                impl_result.events_processed,
+                impl_result.implications_created,
+                impl_result.implications_replaced,
+            )
+        return 0
+    finally:
+        db.close()
+
+
+async def cmd_generate_implications(event_id: str | None = None) -> int:
+    db = SessionLocal()
+    try:
+        from uuid import UUID
+
+        eid = UUID(event_id) if event_id else None
+        result = run_generate_implications(db, event_id=eid, active_only=True)
+        db.commit()
+        logger.info(
+            "Implications generation: events=%d created=%d replaced=%d version=%s",
+            result.events_processed,
+            result.implications_created,
+            result.implications_replaced,
+            result.engine_version,
         )
         return 0
     finally:
@@ -186,6 +226,9 @@ def main() -> None:
     calc_parser = sub.add_parser("calculate-exposure", help="Calculate event asset exposures")
     calc_parser.add_argument("--event-id", help="Limit to a single canonical event UUID")
 
+    impl_parser = sub.add_parser("generate-implications", help="Generate event implications")
+    impl_parser.add_argument("--event-id", help="Limit to a single canonical event UUID")
+
     briefing_parser = sub.add_parser("generate-briefing", help="Generate risk briefing")
     briefing_parser.add_argument(
         "--type",
@@ -210,6 +253,8 @@ def main() -> None:
         code = asyncio.run(cmd_import_exposure())
     elif args.command == "calculate-exposure":
         code = asyncio.run(cmd_calculate_exposure(getattr(args, "event_id", None)))
+    elif args.command == "generate-implications":
+        code = asyncio.run(cmd_generate_implications(getattr(args, "event_id", None)))
     elif args.command == "generate-briefing":
         code = asyncio.run(cmd_generate_briefing(args.type))
     else:

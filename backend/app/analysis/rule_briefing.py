@@ -243,7 +243,10 @@ def _cross_border_patterns(alerts: list[Alert], hotspots: list[HotspotCluster]) 
     return patterns
 
 
-def _potential_implications(alerts: list[Alert]) -> dict[str, list[str]]:
+def _potential_implications(
+    alerts: list[Alert],
+    implication_candidates: list | None = None,
+) -> dict[str, list[str]]:
     implications: dict[str, list[str]] = {
         "economy": [],
         "logistics": [],
@@ -252,6 +255,19 @@ def _potential_implications(alerts: list[Alert]) -> dict[str, list[str]]:
         "finance": [],
     }
     seen: set[str] = set()
+
+    # Event-based implications from persisted candidates (Phase 6)
+    if implication_candidates:
+        briefing_domains = set(implications.keys())
+        for candidate in implication_candidates:
+            category = getattr(candidate, "category", None) or candidate.get("category")
+            if category not in briefing_domains:
+                continue
+            text = getattr(candidate, "title", None) or candidate.get("title", "")
+            if text and text not in seen:
+                seen.add(text)
+                implications[category].append(text)
+
     categories_present = {a.category for a in alerts}
     for category in categories_present:
         mapping = CATEGORY_IMPLICATIONS.get(category, {})
@@ -264,6 +280,43 @@ def _potential_implications(alerts: list[Alert]) -> dict[str, list[str]]:
                     seen.add(stmt)
                     implications[domain].append(stmt)
     return implications
+
+
+def _implication_refs(implication_candidates: list | None) -> dict[str, list[dict[str, str]]]:
+    """Map persisted implication candidates to briefing refs with real IDs."""
+    refs: dict[str, list[dict[str, str]]] = {
+        "economy": [],
+        "logistics": [],
+        "infrastructure": [],
+        "technology": [],
+        "finance": [],
+    }
+    if not implication_candidates:
+        return refs
+
+    briefing_domains = set(refs.keys())
+    for candidate in implication_candidates:
+        category = getattr(candidate, "category", None) or candidate.get("category")
+        if category not in briefing_domains:
+            continue
+        candidate_id = str(getattr(candidate, "id", None) or candidate.get("id", ""))
+        event_id = str(
+            getattr(candidate, "canonical_event_id", None)
+            or candidate.get("canonical_event_id", "")
+        )
+        text = getattr(candidate, "title", None) or candidate.get("title", "")
+        evidence = getattr(candidate, "evidence_level", None) or candidate.get("evidence_level")
+        if not candidate_id or not text:
+            continue
+        refs[category].append(
+            {
+                "id": candidate_id,
+                "text": text,
+                "canonical_event_id": event_id,
+                "evidence_level": evidence,
+            }
+        )
+    return refs
 
 
 def _limitations(
@@ -293,6 +346,7 @@ def generate_rule_briefing(
     hotspots: list[HotspotCluster],
     anomalies: list[TrendAnomaly] | None = None,
     generated_at: datetime | None = None,
+    implication_candidates: list | None = None,
 ) -> dict[str, Any]:
     """Generate structured rule-based briefing content."""
     active = [a for a in alerts if a.is_active]
@@ -302,6 +356,7 @@ def generate_rule_briefing(
     top_countries = _top_countries(active)
 
     source_ids = [str(a.id) for a in active]
+    implication_refs = _implication_refs(implication_candidates)
 
     return {
         "generated_at": now.isoformat().replace("+00:00", "Z"),
@@ -331,7 +386,8 @@ def generate_rule_briefing(
             }
             for a in anomalies
         ],
-        "potential_implications": _potential_implications(active),
+        "potential_implications": _potential_implications(active, implication_candidates),
+        "implication_refs": implication_refs,
         "limitations": _limitations(anomalies, by_source=by_source),
         "source_alert_ids": source_ids,
         "score_breakdown": risk.breakdown,
