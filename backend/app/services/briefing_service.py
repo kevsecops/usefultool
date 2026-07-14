@@ -15,6 +15,15 @@ from app.analysis.trends import detect_trend_anomalies, global_rolling_avg
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.llm.analyzer import LLMAnalysisError, generate_llm_briefing_content
+from app.llm.evidence_package import (
+    build_cross_border_relevance,
+    build_evidence_gaps,
+    build_evidence_package,
+    build_observed_events_section,
+    build_technology_infrastructure_risks,
+    build_verified_exposure_section,
+    has_canonical_events,
+)
 from app.models.alert import Alert
 from app.models.briefing import Briefing
 from app.normalization.datetime_utils import utc_now
@@ -204,6 +213,37 @@ def _load_active_alerts(db: Session) -> list[Alert]:
     return alerts
 
 
+def _build_evidence_enrichment(db: Session, alerts: list[Alert], risk) -> dict | None:
+    """Build canonical-event enrichment sections for briefings."""
+    if not has_canonical_events(db):
+        return None
+
+    now = utc_now()
+    evidence = build_evidence_package(db, risk=risk, generated_at=now, active_alerts=alerts)
+    observed = build_observed_events_section(evidence)
+    verified = build_verified_exposure_section(evidence)
+    gaps = build_evidence_gaps(evidence)
+    cross_border = build_cross_border_relevance(evidence)
+    tech_risks = build_technology_infrastructure_risks(evidence)
+
+    return {
+        "observed_events": observed,
+        "verified_exposure": verified,
+        "confirmed_impacts": [],
+        "cross_border_relevance": cross_border,
+        "technology_infrastructure_risks": tech_risks,
+        "evidence_gaps": gaps,
+        "section_confidence": {
+            "observed_events": observed.get("confidence", "low"),
+            "verified_exposure": verified.get("confidence", "low"),
+            "potential_implications": "medium",
+            "confirmed_impacts": "low",
+            "cross_border_relevance": cross_border[0]["confidence"] if cross_border else "low",
+            "technology_infrastructure_risks": tech_risks[0]["confidence"] if tech_risks else "low",
+        },
+    }
+
+
 def _generate_llm_briefing(db: Session) -> Briefing:
     now = utc_now()
     alerts = _load_active_alerts(db)
@@ -215,6 +255,7 @@ def _generate_llm_briefing(db: Session) -> Briefing:
         hotspots=hotspots,
         anomalies=anomalies,
         generated_at=now,
+        db=db,
     )
     content = _finalize_briefing_content(
         content, risk=risk, active_count=len(alerts), alerts=list(alerts)
@@ -245,6 +286,7 @@ def _generate_rule_based_briefing(db: Session) -> Briefing:
     from app.services.implication_service import list_active_implications
 
     implications = list_active_implications(db)
+    enrichment = _build_evidence_enrichment(db, alerts, risk)
 
     content = generate_rule_briefing(
         alerts,
@@ -253,6 +295,7 @@ def _generate_rule_based_briefing(db: Session) -> Briefing:
         anomalies=anomalies,
         generated_at=now,
         implication_candidates=implications,
+        evidence_enrichment=enrichment,
     )
     content = _finalize_briefing_content(
         content, risk=risk, active_count=len(alerts), alerts=list(alerts)

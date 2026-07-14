@@ -57,6 +57,51 @@ class PotentialImplications(BaseModel):
     finance: list[str] = Field(default_factory=list)
 
 
+class ImplicationRef(BaseModel):
+    id: str
+    text: str
+    canonical_event_id: str = ""
+    evidence_level: str | None = None
+
+
+class ObservedEventsSection(BaseModel):
+    summary: str = ""
+    items: list[dict[str, Any]] = Field(default_factory=list)
+    confidence: str = "low"
+
+
+class VerifiedExposureItem(BaseModel):
+    event_id: str
+    event_title: str
+    asset_name: str
+    asset_type: str
+    exposure_type: str
+    confidence: str = "medium"
+    source_ids: list[str] = Field(default_factory=list)
+
+
+class VerifiedExposureSection(BaseModel):
+    summary: str = ""
+    items: list[VerifiedExposureItem] = Field(default_factory=list)
+    confidence: str = "low"
+
+
+class SourcedClaim(BaseModel):
+    description: str
+    confidence: str = "low"
+    evidence_level: str | None = None
+    source_ids: list[str] = Field(default_factory=list)
+
+
+class SectionConfidence(BaseModel):
+    observed_events: str = "low"
+    verified_exposure: str = "low"
+    potential_implications: str = "low"
+    confirmed_impacts: str = "low"
+    cross_border_relevance: str = "low"
+    technology_infrastructure_risks: str = "low"
+
+
 class BriefingContent(BaseModel):
     generated_at: str
     type: str = "rule_based"
@@ -71,6 +116,14 @@ class BriefingContent(BaseModel):
     cross_border_patterns: list[CrossBorderPattern] = Field(default_factory=list)
     trend_anomalies: list[TrendAnomalyItem] = Field(default_factory=list)
     potential_implications: PotentialImplications = Field(default_factory=PotentialImplications)
+    implication_refs: dict[str, list[ImplicationRef]] = Field(default_factory=dict)
+    observed_events: ObservedEventsSection = Field(default_factory=ObservedEventsSection)
+    verified_exposure: VerifiedExposureSection = Field(default_factory=VerifiedExposureSection)
+    confirmed_impacts: list[SourcedClaim] = Field(default_factory=list)
+    cross_border_relevance: list[SourcedClaim] = Field(default_factory=list)
+    technology_infrastructure_risks: list[SourcedClaim] = Field(default_factory=list)
+    evidence_gaps: list[str] = Field(default_factory=list)
+    section_confidence: SectionConfidence = Field(default_factory=SectionConfidence)
     limitations: list[str] = Field(default_factory=list)
     source_alert_ids: list[str] = Field(default_factory=list)
     score_breakdown: dict[str, Any] = Field(default_factory=dict)

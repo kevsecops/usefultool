@@ -284,6 +284,28 @@ export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProp
 
       <ImplicationsSection implications={content.potential_implications} />
 
+      {content.observed_events && content.observed_events.items.length > 0 && (
+        <ObservedEventsSectionView section={content.observed_events} />
+      )}
+
+      {content.verified_exposure && content.verified_exposure.items.length > 0 && (
+        <VerifiedExposureSectionView section={content.verified_exposure} />
+      )}
+
+      {content.evidence_gaps && content.evidence_gaps.length > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="mb-2 font-semibold text-slate-900">Evidenzlücken</h3>
+          <p className="mb-3 text-xs text-slate-500">
+            Fehlende oder unvollständige Daten in der Analysegrundlage.
+          </p>
+          <ul className="list-inside list-disc space-y-1 text-sm text-slate-600">
+            {content.evidence_gaps.map((gap, i) => (
+              <li key={i}>{gap}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {content.limitations.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 className="mb-2 font-semibold text-slate-700">Einschränkungen</h3>
@@ -327,6 +349,65 @@ export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProp
           : "Regelbasierte Zusammenfassung aus öffentlichen Warnmeldungen — keine amtlichen Bewertungen. Implikationen sind konservative Hypothesen, keine Prognosen."}
       </div>
     </div>
+  );
+}
+
+function ObservedEventsSectionView({
+  section,
+}: {
+  section: NonNullable<Briefing["content"]["observed_events"]>;
+}) {
+  return (
+    <section className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="font-semibold text-blue-900">Observed Events</h3>
+        <span className="text-xs text-blue-600">
+          Vertrauen: {CONFIDENCE_LABELS[section.confidence] ?? section.confidence}
+        </span>
+      </div>
+      <p className="mb-3 text-sm text-blue-800">{section.summary}</p>
+      <ul className="space-y-2">
+        {section.items.map((item) => (
+          <li key={item.canonical_event_id} className="text-sm text-blue-900">
+            <span className="font-medium">{item.event_title}</span>
+            <span className="text-blue-600">
+              {" "}
+              · {item.severity} · {item.observed_count} Observed Event(s) ·{" "}
+              {item.sources.join(", ")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function VerifiedExposureSectionView({
+  section,
+}: {
+  section: NonNullable<Briefing["content"]["verified_exposure"]>;
+}) {
+  return (
+    <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="font-semibold text-emerald-900">Verifizierte Exposure</h3>
+        <span className="text-xs text-emerald-600">
+          Vertrauen: {CONFIDENCE_LABELS[section.confidence] ?? section.confidence}
+        </span>
+      </div>
+      <p className="mb-3 text-sm text-emerald-800">{section.summary}</p>
+      <ul className="space-y-2">
+        {section.items.map((item, i) => (
+          <li key={`${item.event_id}-${item.asset_name}-${i}`} className="text-sm text-emerald-900">
+            <span className="font-medium">{item.asset_name}</span>
+            <span className="text-emerald-600">
+              {" "}
+              ({item.asset_type}) · {item.exposure_type} · Ereignis: {item.event_title}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

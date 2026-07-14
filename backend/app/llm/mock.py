@@ -9,6 +9,13 @@ from app.analysis.clustering import HotspotCluster
 from app.analysis.risk_score import RiskScoreResult
 from app.analysis.rule_briefing import generate_rule_briefing
 from app.analysis.trends import TrendAnomaly
+from app.llm.evidence_package import (
+    build_cross_border_relevance,
+    build_evidence_gaps,
+    build_observed_events_section,
+    build_technology_infrastructure_risks,
+    build_verified_exposure_section,
+)
 from app.llm.provider import LLMProvider
 from app.llm.sanitize import sanitize_alert_text
 from app.models.alert import Alert
@@ -29,25 +36,119 @@ class MockLLMProvider(LLMProvider):
         schema_hint: str,
     ) -> dict[str, Any]:
         del system_prompt, schema_hint
-        # Extract analysis input from user prompt
+        if "<evidence_package>\n" in user_prompt:
+            start = user_prompt.find("<evidence_package>\n")
+            end = user_prompt.find("\n</evidence_package>")
+            evidence = json.loads(user_prompt[start + len("<evidence_package>\n") : end])
+            return _generate_mock_extended_briefing(evidence)
+
         start = user_prompt.find("<analysis_input>\n")
         end = user_prompt.find("\n</analysis_input>")
         if start == -1 or end == -1:
-            raise ValueError("Mock provider: missing analysis_input in prompt")
+            raise ValueError("Mock provider: missing analysis_input or evidence_package in prompt")
 
         analysis_input = json.loads(user_prompt[start + len("<analysis_input>\n") : end])
         return _generate_mock_briefing(analysis_input)
 
 
+def _generate_mock_extended_briefing(evidence: dict[str, Any]) -> dict[str, Any]:
+    """Build extended LLM briefing from evidence package (deterministic)."""
+    stats = evidence.get("stats", {})
+    valid_ids = set(evidence.get("valid_source_ids", []))
+
+    alerts_data: list[dict[str, Any]] = []
+    for event in evidence.get("canonical_events", []):
+        for record in event.get("source_records", []):
+            if record.get("member_type") == "alert":
+                alerts_data.append(record)
+
+    mock_alerts = _alerts_from_input(alerts_data, valid_ids)
+    risk = _risk_from_stats(stats)
+
+    base = generate_rule_briefing(
+        mock_alerts,
+        risk=risk,
+        hotspots=[],
+        anomalies=[],
+    )
+
+    observed_section = build_observed_events_section(evidence)
+    verified_section = build_verified_exposure_section(evidence)
+    evidence_gaps = build_evidence_gaps(evidence)
+    cross_border = build_cross_border_relevance(evidence)
+    tech_risks = build_technology_infrastructure_risks(evidence)
+
+    implications: dict[str, list[str]] = {
+        "economy": [],
+        "logistics": [],
+        "infrastructure": [],
+        "technology": [],
+        "finance": [],
+    }
+    for event in evidence.get("canonical_events", []):
+        for imp in event.get("implication_candidates", []):
+            category = imp.get("category")
+            title = imp.get("title", "")
+            if category in implications and title and title not in implications[category]:
+                implications[category].append(title)
+
+    base["type"] = "llm"
+    base["observed_events"] = observed_section
+    base["verified_exposure"] = verified_section
+    base["confirmed_impacts"] = []
+    base["cross_border_relevance"] = cross_border
+    base["technology_infrastructure_risks"] = tech_risks
+    base["evidence_gaps"] = evidence_gaps
+    base["potential_implications"] = implications
+    base["section_confidence"] = {
+        "observed_events": observed_section.get("confidence", "low"),
+        "verified_exposure": verified_section.get("confidence", "low"),
+        "potential_implications": "medium" if any(implications.values()) else "low",
+        "confirmed_impacts": "low",
+        "cross_border_relevance": cross_border[0]["confidence"] if cross_border else "low",
+        "technology_infrastructure_risks": tech_risks[0]["confidence"] if tech_risks else "low",
+    }
+    base["limitations"] = list(evidence.get("known_limitations", [])) + [
+        "Mock-Provider für Demo/Tests — keine echte semantische Analyse.",
+    ]
+    if evidence.get("truncated_events"):
+        base["limitations"].append(
+            f"Analyse basiert auf Top-{len(evidence.get('canonical_events', []))} Ereignissen "
+            f"(von {evidence.get('total_event_count', 0)} aktiv)."
+        )
+
+    event_count = stats.get("active_event_count", len(evidence.get("canonical_events", [])))
+    base["summary"] = (
+        f"LLM-Evidenzanalyse: {event_count} kanonische Ereignisse, "
+        f"{stats.get('active_alert_count', 0)} aktive Warnungen. "
+        f"Global Risk Score: {stats.get('global_risk_score', 0)}/100. "
+        + (base["summary"].split(". ", 2)[-1] if ". " in base["summary"] else base["summary"])
+    )
+
+    if len({r.get("source") for e in evidence.get("canonical_events", []) for r in e.get("source_records", [])}) >= 2:
+        cross_ids = list(valid_ids)[:5]
+        base["cross_border_patterns"].insert(
+            0,
+            {
+                "type": "multi_source_events",
+                "description": "Aktive kanonische Ereignisse mit Quellen aus mehreren Datenfeeds.",
+                "alert_ids": [aid for aid in cross_ids if aid in valid_ids][:5],
+                "confidence": "medium",
+            },
+        )
+
+    base["source_alert_ids"] = [str(a.id) for a in mock_alerts]
+    return base
+
+
 def _generate_mock_briefing(analysis_input: dict[str, Any]) -> dict[str, Any]:
-    """Build LLM-style briefing from structured input (deterministic)."""
+    """Build LLM-style briefing from alert-based input (deterministic)."""
     stats = analysis_input.get("stats", {})
     alerts_data = analysis_input.get("alerts", [])
     clusters = analysis_input.get("clusters", [])
     anomalies = analysis_input.get("trend_anomalies", [])
     valid_ids = set(analysis_input.get("valid_alert_ids", []))
 
-    # Reconstruct minimal alert-like objects for rule_briefing helper logic
     mock_alerts = _alerts_from_input(alerts_data, valid_ids)
     hotspots = _hotspots_from_clusters(clusters)
     risk = _risk_from_stats(stats)
@@ -60,8 +161,21 @@ def _generate_mock_briefing(analysis_input: dict[str, Any]) -> dict[str, Any]:
         anomalies=trend_anomalies,
     )
 
-    # Transform to LLM briefing
     base["type"] = "llm"
+    base["observed_events"] = {"summary": "Keine kanonischen Ereignisse — nur Alert-Daten.", "items": [], "confidence": "low"}
+    base["verified_exposure"] = {"summary": "Keine Exposure-Daten verfügbar.", "items": [], "confidence": "low"}
+    base["confirmed_impacts"] = []
+    base["cross_border_relevance"] = []
+    base["technology_infrastructure_risks"] = []
+    base["evidence_gaps"] = ["Keine kanonischen Ereignisse — Alert-basierter Fallback-Input."]
+    base["section_confidence"] = {
+        "observed_events": "low",
+        "verified_exposure": "low",
+        "potential_implications": "low",
+        "confirmed_impacts": "low",
+        "cross_border_relevance": "low",
+        "technology_infrastructure_risks": "low",
+    }
     base["limitations"] = [
         "KI-generierte Interpretation basierend auf strukturierten Warnungsdaten.",
         "Keine amtlichen Bewertungen — Muster sind Beobachtungen, keine Kausalitätsnachweise.",
@@ -73,7 +187,6 @@ def _generate_mock_briefing(analysis_input: dict[str, Any]) -> dict[str, Any]:
             f"(von {analysis_input.get('total_active_count', len(alerts_data))} aktiv)."
         )
 
-    # Add cross-source correlation pattern if multiple sources present
     sources = {a.get("source") for a in alerts_data}
     if len(sources) >= 2 and len(alerts_data) >= 2:
         cross_ids = [a["id"] for a in alerts_data[:5] if a["id"] in valid_ids]

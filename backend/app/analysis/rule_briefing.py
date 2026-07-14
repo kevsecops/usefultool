@@ -347,6 +347,7 @@ def generate_rule_briefing(
     anomalies: list[TrendAnomaly] | None = None,
     generated_at: datetime | None = None,
     implication_candidates: list | None = None,
+    evidence_enrichment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate structured rule-based briefing content."""
     active = [a for a in alerts if a.is_active]
@@ -358,7 +359,7 @@ def generate_rule_briefing(
     source_ids = [str(a.id) for a in active]
     implication_refs = _implication_refs(implication_candidates)
 
-    return {
+    content = {
         "generated_at": now.isoformat().replace("+00:00", "Z"),
         "type": "rule_based",
         "active_count": len(active),
@@ -391,4 +392,33 @@ def generate_rule_briefing(
         "limitations": _limitations(anomalies, by_source=by_source),
         "source_alert_ids": source_ids,
         "score_breakdown": risk.breakdown,
+        "observed_events": {"summary": "", "items": [], "confidence": "low"},
+        "verified_exposure": {"summary": "", "items": [], "confidence": "low"},
+        "confirmed_impacts": [],
+        "cross_border_relevance": [],
+        "technology_infrastructure_risks": [],
+        "evidence_gaps": [],
+        "section_confidence": {
+            "observed_events": "low",
+            "verified_exposure": "low",
+            "potential_implications": "low",
+            "confirmed_impacts": "low",
+            "cross_border_relevance": "low",
+            "technology_infrastructure_risks": "low",
+        },
     }
+
+    if evidence_enrichment:
+        for key in (
+            "observed_events",
+            "verified_exposure",
+            "confirmed_impacts",
+            "cross_border_relevance",
+            "technology_infrastructure_risks",
+            "evidence_gaps",
+            "section_confidence",
+        ):
+            if key in evidence_enrichment:
+                content[key] = evidence_enrichment[key]
+
+    return content

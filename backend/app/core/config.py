@@ -91,6 +91,8 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o-mini"
     llm_timeout_seconds: int = 30
     llm_max_tokens: int = 2048
+    llm_max_events: int = 20
+    llm_max_exposures_per_event: int = 10
 
     risk_score_scaling: int = 50
     risk_cluster_radius_km: int = 100

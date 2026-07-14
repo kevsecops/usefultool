@@ -29,6 +29,8 @@
 
 **Showcase Phase 3:** NASA FIRMS thermal anomalies werden **während Ingest geclustert** — nur Aggregat-Cluster als `observed_events` (`active_fire_cluster`), nie einzelne Punkte. API: `GET /api/v1/fire-clusters`. Siehe [docs/firms-mapping.md](docs/firms-mapping.md), [docs/fire-clustering.md](docs/fire-clustering.md).
 
+**Showcase Phase 7:** LLM Evidence Package — erweiterte Briefings mit Observed Events, Verified Exposure, Evidence Gaps (`LLM_ENABLED=false` by default). Siehe [docs/llm-analysis.md](docs/llm-analysis.md).
+
 Details: [docs/data-sources.md](docs/data-sources.md)
 
 ## Architekturübersicht
@@ -182,6 +184,8 @@ cd backend && pytest -v
 | `LLM_MODEL` | `gpt-4o-mini` | Modellname (z. B. `gpt-4o-mini`, `llama3`) |
 | `LLM_TIMEOUT_SECONDS` | `30` | LLM Request-Timeout |
 | `LLM_MAX_TOKENS` | `2048` | Max. LLM-Antwortlänge |
+| `LLM_MAX_EVENTS` | `20` | Max. kanonische Ereignisse im Evidence Package |
+| `LLM_MAX_EXPOSURES_PER_EVENT` | `10` | Max. Asset-Exposures pro Ereignis im LLM-Input |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS-Origin |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Frontend API base URL (browser) |
 | `API_URL` | `http://backend:8000` | Server-side API URL (Docker) |

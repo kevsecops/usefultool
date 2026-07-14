@@ -6,9 +6,12 @@ from collections import Counter
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from app.analysis.clustering import HotspotCluster
 from app.analysis.risk_score import RiskScoreResult
 from app.analysis.trends import TrendAnomaly
+from app.llm.evidence_package import build_evidence_package, has_canonical_events
 from app.llm.sanitize import sanitize_alert_text
 from app.models.alert import Alert
 
@@ -113,7 +116,7 @@ def _proximity_hints(hotspots: list[HotspotCluster]) -> list[dict[str, Any]]:
     return hints
 
 
-def build_analysis_input(
+def _build_alert_input(
     alerts: list[Alert],
     *,
     risk: RiskScoreResult,
@@ -121,11 +124,12 @@ def build_analysis_input(
     anomalies: list[TrendAnomaly],
     generated_at: datetime,
 ) -> dict[str, Any]:
-    """Build compact structured input from normalized data only."""
+    """Legacy alert-based input when no canonical events exist."""
     active = [a for a in alerts if a.is_active]
     selected = _top_alerts(active)
 
     return {
+        "input_mode": "alerts",
         "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
         "stats": _stats_block(active, risk),
         "alerts": [_alert_summary(a) for a in selected],
@@ -142,6 +146,58 @@ def build_analysis_input(
             for a in anomalies
         ],
         "valid_alert_ids": [str(a.id) for a in active],
+        "valid_source_ids": [str(a.id) for a in active],
         "truncated": len(active) > MAX_ALERTS,
         "total_active_count": len(active),
     }
+
+
+def build_analysis_input(
+    alerts: list[Alert],
+    *,
+    risk: RiskScoreResult,
+    hotspots: list[HotspotCluster],
+    anomalies: list[TrendAnomaly],
+    generated_at: datetime,
+    db: Session | None = None,
+) -> dict[str, Any]:
+    """Build compact structured input — evidence package when canonical events exist."""
+    active = [a for a in alerts if a.is_active]
+
+    if db is not None and has_canonical_events(db):
+        evidence = build_evidence_package(
+            db,
+            risk=risk,
+            generated_at=generated_at,
+            active_alerts=active,
+        )
+        return {
+            "input_mode": "evidence_package",
+            "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
+            "stats": _stats_block(active, risk),
+            "evidence_package": evidence,
+            "clusters": _clusters_block(hotspots),
+            "proximity_hints": _proximity_hints(hotspots),
+            "trend_anomalies": [
+                {
+                    "dimension": a.dimension,
+                    "key": a.key,
+                    "current_count": a.current_count,
+                    "rolling_avg": a.rolling_avg,
+                    "ratio": a.ratio,
+                }
+                for a in anomalies
+            ],
+            "valid_alert_ids": [str(a.id) for a in active],
+            "valid_source_ids": evidence.get("valid_source_ids", []),
+            "truncated": evidence.get("truncated_events", False),
+            "total_active_count": len(active),
+        }
+
+    return _build_alert_input(
+        alerts,
+        risk=risk,
+        hotspots=hotspots,
+        anomalies=anomalies,
+        generated_at=generated_at,
+    )
