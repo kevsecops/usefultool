@@ -1,0 +1,132 @@
+[
+  {
+    "source_asset_id": "apt-jfk",
+    "name": "John F. Kennedy International Airport",
+    "country_code": "US",
+    "region": "New York",
+    "latitude": 40.6413,
+    "longitude": -73.7781,
+    "importance_level": "critical",
+    "metadata": {"iata": "JFK", "icao": "KJFK", "annual_passengers_millions": 62}
+  },
+  {
+    "source_asset_id": "apt-fra",
+    "name": "Frankfurt Airport",
+    "country_code": "DE",
+    "region": "Hesse",
+    "latitude": 50.0379,
+    "longitude": 8.5622,
+    "importance_level": "critical",
+    "metadata": {"iata": "FRA", "icao": "EDDF", "annual_passengers_millions": 59}
+  },
+  {
+    "source_asset_id": "apt-dxb",
+    "name": "Dubai International Airport",
+    "country_code": "AE",
+    "region": "Dubai",
+    "latitude": 25.2532,
+    "longitude": 55.3657,
+    "importance_level": "critical",
+    "metadata": {"iata": "DXB", "icao": "OMDB", "annual_passengers_millions": 87}
+  },
+  {
+    "source_asset_id": "apt-lhr",
+    "name": "London Heathrow Airport",
+    "country_code": "GB",
+    "region": "England",
+    "latitude": 51.4700,
+    "longitude": -0.4543,
+    "importance_level": "critical",
+    "metadata": {"iata": "LHR", "icao": "EGLL", "annual_passengers_millions": 79}
+  },
+  {
+    "source_asset_id": "apt-hnd",
+    "name": "Tokyo Haneda Airport",
+    "country_code": "JP",
+    "region": "Tokyo",
+    "latitude": 35.5494,
+    "longitude": 139.7798,
+    "importance_level": "critical",
+    "metadata": {"iata": "HND", "icao": "RJTT", "annual_passengers_millions": 72}
+  },
+  {
+    "source_asset_id": "apt-sin",
+    "name": "Singapore Changi Airport",
+    "country_code": "SG",
+    "region": "Singapore",
+    "latitude": 1.3644,
+    "longitude": 103.9915,
+    "importance_level": "critical",
+    "metadata": {"iata": "SIN", "icao": "WSSS", "annual_passengers_millions": 59}
+  },
+  {
+    "source_asset_id": "apt-ord",
+    "name": "Chicago O'Hare International Airport",
+    "country_code": "US",
+    "region": "Illinois",
+    "latitude": 41.9742,
+    "longitude": -87.9073,
+    "importance_level": "high",
+    "metadata": {"iata": "ORD", "icao": "KORD", "annual_passengers_millions": 74}
+  },
+  {
+    "source_asset_id": "apt-cdg",
+    "name": "Paris Charles de Gaulle Airport",
+    "country_code": "FR",
+    "region": "Île-de-France",
+    "latitude": 49.0097,
+    "longitude": 2.5479,
+    "importance_level": "high",
+    "metadata": {"iata": "CDG", "icao": "LFPG", "annual_passengers_millions": 67}
+  },
+  {
+    "source_asset_id": "apt-ams",
+    "name": "Amsterdam Schiphol Airport",
+    "country_code": "NL",
+    "region": "North Holland",
+    "latitude": 52.3105,
+    "longitude": 4.7683,
+    "importance_level": "high",
+    "metadata": {"iata": "AMS", "icao": "EHAM", "annual_passengers_millions": 62}
+  },
+  {
+    "source_asset_id": "apt-icn",
+    "name": "Incheon International Airport",
+    "country_code": "KR",
+    "region": "Incheon",
+    "latitude": 37.4602,
+    "longitude": 126.4407,
+    "importance_level": "high",
+    "metadata": {"iata": "ICN", "icao": "RKSI", "annual_passengers_millions": 68}
+  },
+  {
+    "source_asset_id": "apt-syd",
+    "name": "Sydney Kingsford Smith Airport",
+    "country_code": "AU",
+    "region": "New South Wales",
+    "latitude": -33.9399,
+    "longitude": 151.1753,
+    "importance_level": "high",
+    "metadata": {"iata": "SYD", "icao": "YSSY", "annual_passengers_millions": 44}
+  },
+  {
+    "source_asset_id": "apt-gru",
+    "name": "São Paulo/Guarulhos International Airport",
+    "country_code": "BR",
+    "region": "São Paulo",
+    "latitude": -23.4356,
+    "longitude": -46.4731,
+    "importance_level": "high",
+    "metadata": {"iata": "GRU", "icao": "SBGR", "annual_passengers_millions": 42}
+  },
+  {
+    "source_asset_id": "apt-del",
+    "name": "Indira Gandhi International Airport",
+    "country_code": "IN",
+    "region": "Delhi",
+    "latitude": 28.5562,
+    "longitude": 77.1000,
+    "importance_level": "high",
+    "metadata": {"iata": "DEL", "icao": "VIDP", "annual_passengers_millions": 72}
+  }
+]

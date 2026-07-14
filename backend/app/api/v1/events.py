@@ -12,6 +12,7 @@ from app.schemas.canonical_event import (
     CanonicalEventResponse,
     CanonicalEventSourcesResponse,
 )
+from app.schemas.exposure import EventExposureListResponse
 from app.schemas.common import Severity
 from app.services.canonical_event_service import (
     get_canonical_event,
@@ -74,3 +75,16 @@ def get_event_sources(
     if not sources:
         raise HTTPException(status_code=404, detail="Canonical event not found")
     return sources
+
+
+@router.get("/{event_id}/exposures", response_model=EventExposureListResponse)
+def get_event_exposures(
+    event_id: UUID,
+    db: Session = Depends(get_db),
+):
+    from app.services.exposure_service import list_event_exposures
+
+    result = list_event_exposures(db, event_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Canonical event not found")
+    return result

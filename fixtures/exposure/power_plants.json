@@ -1,0 +1,102 @@
+[
+  {
+    "source_asset_id": "pp-three-gorges",
+    "name": "Three Gorges Dam Hydroelectric Plant",
+    "country_code": "CN",
+    "region": "Hubei",
+    "latitude": 30.8231,
+    "longitude": 111.0035,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 22500, "fuel": "hydro", "operator": "CTG"}
+  },
+  {
+    "source_asset_id": "pp-itabashi",
+    "name": "Kashiwazaki-Kariwa Nuclear Power Plant",
+    "country_code": "JP",
+    "region": "Niigata",
+    "latitude": 37.4261,
+    "longitude": 138.5982,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 7965, "fuel": "nuclear", "operator": "TEPCO"}
+  },
+  {
+    "source_asset_id": "pp-gravelines",
+    "name": "Gravelines Nuclear Power Station",
+    "country_code": "FR",
+    "region": "Hauts-de-France",
+    "latitude": 51.0147,
+    "longitude": 2.1361,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 5460, "fuel": "nuclear", "operator": "EDF"}
+  },
+  {
+    "source_asset_id": "pp-taichung",
+    "name": "Taichung Power Plant",
+    "country_code": "TW",
+    "region": "Taichung",
+    "latitude": 24.2136,
+    "longitude": 120.4819,
+    "importance_level": "high",
+    "metadata": {"capacity_mw": 5824, "fuel": "coal", "operator": "Taipower"}
+  },
+  {
+    "source_asset_id": "pp-belchatow",
+    "name": "Bełchatów Power Station",
+    "country_code": "PL",
+    "region": "Łódź",
+    "latitude": 51.2633,
+    "longitude": 19.3356,
+    "importance_level": "high",
+    "metadata": {"capacity_mw": 5472, "fuel": "coal", "operator": "PGE"}
+  },
+  {
+    "source_asset_id": "pp-scherer",
+    "name": "Robert W. Scherer Power Plant",
+    "country_code": "US",
+    "region": "Georgia",
+    "latitude": 33.0606,
+    "longitude": -83.7211,
+    "importance_level": "high",
+    "metadata": {"capacity_mw": 3564, "fuel": "coal", "operator": "Georgia Power"}
+  },
+  {
+    "source_asset_id": "pp-drax",
+    "name": "Drax Power Station",
+    "country_code": "GB",
+    "region": "North Yorkshire",
+    "latitude": 53.7356,
+    "longitude": -0.9964,
+    "importance_level": "high",
+    "metadata": {"capacity_mw": 3960, "fuel": "biomass", "operator": "Drax Group"}
+  },
+  {
+    "source_asset_id": "pp-itapu",
+    "name": "Itaipu Hydroelectric Plant",
+    "country_code": "BR",
+    "region": "Paraná",
+    "latitude": -25.4083,
+    "longitude": -54.5889,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 14000, "fuel": "hydro", "operator": "Itaipu Binacional"}
+  },
+  {
+    "source_asset_id": "pp-zaporizhzhia",
+    "name": "Zaporizhzhia Nuclear Power Plant",
+    "country_code": "UA",
+    "region": "Zaporizhzhia",
+    "latitude": 47.5122,
+    "longitude": 34.5856,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 5700, "fuel": "nuclear", "operator": "Energoatom"}
+  },
+  {
+    "source_asset_id": "pp-solar-noor",
+    "name": "Noor Ouarzazate Solar Complex",
+    "country_code": "MA",
+    "region": "Drâa-Tafilalet",
+    "latitude": 31.0478,
+    "longitude": -6.8728,
+    "importance_level": "medium",
+    "metadata": {"capacity_mw": 580, "fuel": "solar", "operator": "MASEN"}
+  }
+]

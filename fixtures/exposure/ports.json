@@ -1,0 +1,122 @@
+[
+  {
+    "source_asset_id": "port-rotterdam",
+    "name": "Port of Rotterdam",
+    "country_code": "NL",
+    "region": "South Holland",
+    "latitude": 51.9475,
+    "longitude": 4.1425,
+    "importance_level": "critical",
+    "metadata": {"un_locode": "NLRTM", "annual_teu_millions": 14.5}
+  },
+  {
+    "source_asset_id": "port-singapore",
+    "name": "Port of Singapore",
+    "country_code": "SG",
+    "region": "Singapore",
+    "latitude": 1.2644,
+    "longitude": 103.8222,
+    "importance_level": "critical",
+    "metadata": {"un_locode": "SGSIN", "annual_teu_millions": 37.0}
+  },
+  {
+    "source_asset_id": "port-la",
+    "name": "Port of Los Angeles",
+    "country_code": "US",
+    "region": "California",
+    "latitude": 33.7405,
+    "longitude": -118.2720,
+    "importance_level": "critical",
+    "metadata": {"un_locode": "USLAX", "annual_teu_millions": 9.0}
+  },
+  {
+    "source_asset_id": "port-hamburg",
+    "name": "Port of Hamburg",
+    "country_code": "DE",
+    "region": "Hamburg",
+    "latitude": 53.5411,
+    "longitude": 9.9847,
+    "importance_level": "high",
+    "metadata": {"un_locode": "DEHAM", "annual_teu_millions": 8.5}
+  },
+  {
+    "source_asset_id": "port-shanghai",
+    "name": "Port of Shanghai",
+    "country_code": "CN",
+    "region": "Shanghai",
+    "latitude": 31.2304,
+    "longitude": 121.4737,
+    "importance_level": "critical",
+    "metadata": {"un_locode": "CNSHA", "annual_teu_millions": 47.0}
+  },
+  {
+    "source_asset_id": "port-antwerp",
+    "name": "Port of Antwerp-Bruges",
+    "country_code": "BE",
+    "region": "Flanders",
+    "latitude": 51.2630,
+    "longitude": 4.4120,
+    "importance_level": "high",
+    "metadata": {"un_locode": "BEANR", "annual_teu_millions": 12.0}
+  },
+  {
+    "source_asset_id": "port-dubai",
+    "name": "Port of Jebel Ali (Dubai)",
+    "country_code": "AE",
+    "region": "Dubai",
+    "latitude": 25.0113,
+    "longitude": 55.0611,
+    "importance_level": "high",
+    "metadata": {"un_locode": "AEJEA", "annual_teu_millions": 14.0}
+  },
+  {
+    "source_asset_id": "port-busan",
+    "name": "Port of Busan",
+    "country_code": "KR",
+    "region": "Busan",
+    "latitude": 35.1028,
+    "longitude": 129.0403,
+    "importance_level": "high",
+    "metadata": {"un_locode": "KRPUS", "annual_teu_millions": 22.0}
+  },
+  {
+    "source_asset_id": "port-piraeus",
+    "name": "Port of Piraeus",
+    "country_code": "GR",
+    "region": "Attica",
+    "latitude": 37.9420,
+    "longitude": 23.6460,
+    "importance_level": "medium",
+    "metadata": {"un_locode": "GRPIR", "annual_teu_millions": 5.4}
+  },
+  {
+    "source_asset_id": "port-houston",
+    "name": "Port of Houston",
+    "country_code": "US",
+    "region": "Texas",
+    "latitude": 29.7355,
+    "longitude": -95.2678,
+    "importance_level": "high",
+    "metadata": {"un_locode": "USHOU", "annual_teu_millions": 3.5}
+  },
+  {
+    "source_asset_id": "port-tokyo",
+    "name": "Port of Tokyo",
+    "country_code": "JP",
+    "region": "Tokyo",
+    "latitude": 35.6180,
+    "longitude": 139.7756,
+    "importance_level": "high",
+    "metadata": {"un_locode": "JPTYO", "annual_teu_millions": 4.9}
+  },
+  {
+    "source_asset_id": "port-felixstowe",
+    "name": "Port of Felixstowe",
+    "country_code": "GB",
+    "region": "Suffolk",
+    "latitude": 51.9550,
+    "longitude": 1.3512,
+    "importance_level": "medium",
+    "metadata": {"un_locode": "GBFXT", "annual_teu_millions": 4.0}
+  }
+]

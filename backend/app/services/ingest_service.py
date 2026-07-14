@@ -442,6 +442,11 @@ async def run_ingest(
 
         run_correlation(db)
 
+        if settings.exposure_auto_run:
+            from app.services.exposure_service import run_calculate_exposure
+
+            run_calculate_exposure(db, active_only=True)
+
     return run
 
 

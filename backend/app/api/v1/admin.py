@@ -8,8 +8,10 @@ from app.core.security import verify_admin_token
 from app.schemas.admin import IngestRequest, IngestResponse
 from app.schemas.briefing import GenerateBriefingRequest, GenerateBriefingResponse
 from app.schemas.canonical_event import CorrelateEventsResponse
+from app.schemas.exposure import CalculateExposureRequest, CalculateExposureResponse
 from app.services.briefing_service import generate_briefing
 from app.services.correlation_service import run_correlation
+from app.services.exposure_service import run_calculate_exposure
 from app.services.ingest_service import run_ingest
 from app.services.status_service import get_admin_status
 
@@ -69,3 +71,22 @@ def trigger_generate_briefing(
         overall_risk_score=briefing.overall_risk_score,
         generated_at=briefing.generated_at,
     )
+
+
+@router.post(
+    "/calculate-exposure",
+    response_model=CalculateExposureResponse,
+    dependencies=[Depends(verify_admin_token)],
+)
+def trigger_calculate_exposure(
+    request: CalculateExposureRequest | None = None,
+    db: Session = Depends(get_db),
+) -> CalculateExposureResponse:
+    req = request or CalculateExposureRequest()
+    result = run_calculate_exposure(
+        db,
+        event_id=req.event_id,
+        active_only=req.active_only,
+    )
+    db.commit()
+    return result

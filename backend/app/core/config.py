@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     correlation_distance_km: float = 150.0
     correlation_auto_run: bool = True
 
+    exposure_buffer_km: float = 50.0
+    exposure_auto_run: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

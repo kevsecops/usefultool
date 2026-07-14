@@ -11,6 +11,7 @@ from app.core.logging import setup_logging, get_logger
 from app.db.session import SessionLocal
 from app.services.briefing_service import generate_briefing
 from app.services.correlation_service import run_correlation
+from app.services.exposure_service import import_exposure_fixtures, run_calculate_exposure
 from app.services.ingest_service import run_ingest
 from app.sources.registry import get_adapters
 
@@ -79,6 +80,7 @@ async def cmd_health() -> int:
 
 
 async def cmd_correlate() -> int:
+    settings = get_settings()
     db = SessionLocal()
     try:
         result = run_correlation(db)
@@ -90,6 +92,51 @@ async def cmd_correlate() -> int:
             result.links_created,
             result.possible_matches,
             result.members_processed,
+        )
+        if settings.exposure_auto_run:
+            exp_result = run_calculate_exposure(db, active_only=True)
+            db.commit()
+            logger.info(
+                "Exposure auto-run: events=%d created=%d updated=%d",
+                exp_result.events_processed,
+                exp_result.exposures_created,
+                exp_result.exposures_updated,
+            )
+        return 0
+    finally:
+        db.close()
+
+
+async def cmd_import_exposure() -> int:
+    db = SessionLocal()
+    try:
+        result = import_exposure_fixtures(db)
+        db.commit()
+        logger.info(
+            "Exposure fixtures imported: created=%d updated=%d total=%d",
+            result.assets_created,
+            result.assets_updated,
+            result.total_assets,
+        )
+        return 0
+    finally:
+        db.close()
+
+
+async def cmd_calculate_exposure(event_id: str | None = None) -> int:
+    db = SessionLocal()
+    try:
+        from uuid import UUID
+
+        eid = UUID(event_id) if event_id else None
+        result = run_calculate_exposure(db, event_id=eid, active_only=True)
+        db.commit()
+        logger.info(
+            "Exposure calculation: events=%d created=%d updated=%d version=%s",
+            result.events_processed,
+            result.exposures_created,
+            result.exposures_updated,
+            result.analysis_version,
         )
         return 0
     finally:
@@ -134,6 +181,11 @@ def main() -> None:
 
     sub.add_parser("correlate", help="Run cross-source event correlation")
 
+    sub.add_parser("import-exposure", help="Import demo exposure asset fixtures")
+
+    calc_parser = sub.add_parser("calculate-exposure", help="Calculate event asset exposures")
+    calc_parser.add_argument("--event-id", help="Limit to a single canonical event UUID")
+
     briefing_parser = sub.add_parser("generate-briefing", help="Generate risk briefing")
     briefing_parser.add_argument(
         "--type",
@@ -154,6 +206,10 @@ def main() -> None:
         code = asyncio.run(cmd_health())
     elif args.command == "correlate":
         code = asyncio.run(cmd_correlate())
+    elif args.command == "import-exposure":
+        code = asyncio.run(cmd_import_exposure())
+    elif args.command == "calculate-exposure":
+        code = asyncio.run(cmd_calculate_exposure(getattr(args, "event_id", None)))
     elif args.command == "generate-briefing":
         code = asyncio.run(cmd_generate_briefing(args.type))
     else:

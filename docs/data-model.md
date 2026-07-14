@@ -226,6 +226,50 @@ Cross-source aggregation of related alerts and observed events. Source rows are 
 **API:** `GET /api/v1/events`, `GET /api/v1/events/{id}`, `GET /api/v1/events/{id}/sources`  
 **Korrelation:** [event-correlation.md](./event-correlation.md)
 
+## ExposureAsset (Phase 5)
+
+Demo/showcase critical infrastructure points for geospatial exposure analysis.
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|--------------|
+| `id` | UUID | ja | Primärschlüssel |
+| `asset_type` | enum | ja | `port`, `airport`, `power_plant` |
+| `name` | string | ja | Anzeigename |
+| `country_code` | string(2) | nein | ISO 3166-1 alpha-2 |
+| `region` | string | nein | Region/Bundesland |
+| `latitude` / `longitude` | float | nein | WGS84 |
+| `geometry` | PostGIS POINT | nein | Denormalisiert aus lat/lon |
+| `importance_level` | enum | ja | `low`, `medium`, `high`, `critical` |
+| `source` | string | ja | Default `demo_fixture` |
+| `source_url` | string | nein | |
+| `source_asset_id` | string | nein | Dedup-Key innerhalb source |
+| `metadata` | JSONB | nein | IATA, capacity, etc. |
+| `created_at` / `updated_at` | datetime | ja | |
+
+**API:** `GET /api/v1/assets`, `GET /api/v1/assets/{id}`  
+**Import:** `python -m app.jobs.cli import-exposure`  
+**Doku:** [exposure-analysis.md](./exposure-analysis.md)
+
+## EventAssetExposure (Phase 5)
+
+Exposure link between a canonical event and an infrastructure asset.
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|--------------|
+| `id` | UUID | ja | Primärschlüssel |
+| `event_id` | UUID FK | ja | `canonical_events.id` |
+| `asset_id` | UUID FK | ja | `exposure_assets.id` |
+| `exposure_type` | enum | ja | `inside_event_area`, `near_event_area`, `system_level_exposure`, `unknown` |
+| `distance_km` | float | nein | Haversine für Punkt-Events |
+| `overlap` | bool | ja | Asset innerhalb Event-Geometrie/Radius |
+| `confidence` | enum | ja | `low`, `medium`, `high` |
+| `rationale` | text | nein | Regel-Erklärung |
+| `calculated_at` | datetime | ja | |
+| `analysis_version` | string | ja | Regelversion (aktuell `1`) |
+
+**API:** `GET /api/v1/events/{id}/exposures`, `GET /api/v1/exposure/analysis?event_id=`  
+**Admin:** `POST /api/v1/admin/calculate-exposure`
+
 ### SourceStatus (persistent)
 
 | Feld | Typ | Beschreibung |
