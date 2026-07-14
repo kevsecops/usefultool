@@ -1,0 +1,49 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1783932807913,
+    "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson",
+    "title": "Showcase — Earthquake near LA Port",
+    "status": 200,
+    "api": "2.7.0",
+    "count": 1
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 6.8,
+        "place": "15 km W of San Pedro, California",
+        "time": 1783932807913,
+        "updated": 1783945721040,
+        "tz": null,
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000showcase1",
+        "detail": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000showcase1.geojson",
+        "felt": 842,
+        "cdi": 6.2,
+        "mmi": 6.8,
+        "alert": "orange",
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 720,
+        "net": "us",
+        "code": "7000showcase1",
+        "ids": ",us7000showcase1,",
+        "sources": ",us,",
+        "types": ",ground-failure,losspager,moment-tensor,origin,phase-data,shakemap,",
+        "nst": 142,
+        "dmin": 0.12,
+        "rms": 0.65,
+        "gap": 28,
+        "magType": "mww",
+        "type": "earthquake",
+        "title": "M 6.8 - 15 km W of San Pedro, California"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-118.35, 33.72, 8]
+      },
+      "id": "us7000showcase1"
+    }
+  ]
+}

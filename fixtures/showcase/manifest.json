@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "description": "Curated showcase scenarios for Global Risk Intelligence demo mode",
+  "scenarios": [
+    {
+      "id": "earthquake_port",
+      "title": "Strong Earthquake near Port & Airport",
+      "summary": "M6.8 earthquake off Southern California coast — Port of Los Angeles and LAX within exposure radius.",
+      "sources": ["usgs"],
+      "region": "Southern California, USA"
+    },
+    {
+      "id": "tropical_storm",
+      "title": "Tropical Storm & Port Infrastructure",
+      "summary": "Category 3 tropical cyclone approaching Mediterranean — GDACS alert, EONET track, and port exposure.",
+      "sources": ["gdacs", "eonet"],
+      "region": "Western Mediterranean"
+    },
+    {
+      "id": "geomagnetic_storm",
+      "title": "Geomagnetic Storm G4",
+      "summary": "NOAA SWPC G4 severe geomagnetic storm — power grid and infrastructure implications.",
+      "sources": ["noaa_swpc"],
+      "region": "Northern Hemisphere (poleward of 50°)"
+    }
+  ],
+  "ingest_sources": ["usgs", "gdacs", "eonet", "noaa_swpc"],
+  "exposure_fixtures": ["ports.json", "airports.json", "power_plants.json"]
+}

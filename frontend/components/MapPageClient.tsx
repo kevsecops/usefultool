@@ -3,12 +3,15 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Alert, AlertFilters } from "@/types/alert";
+import type { CanonicalEvent, ObservedEvent } from "@/types/events";
+import type { ExposureAsset } from "@/types/exposure";
 import { Filters } from "@/components/Filters";
+import { LayerControls, DEFAULT_LAYER_VISIBILITY } from "@/components/LayerControls";
+import type { LayerVisibility } from "@/components/LayerControls";
 import { filtersFromSearchParams } from "@/lib/filters";
 import { AlertMap } from "@/components/AlertMap";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function buildQuery(filters: AlertFilters): string {
   const params = new URLSearchParams();
@@ -25,6 +28,13 @@ function buildQuery(filters: AlertFilters): string {
 function MapContent() {
   const searchParams = useSearchParams();
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [canonicalEvents, setCanonicalEvents] = useState<CanonicalEvent[]>([]);
+  const [observedEvents, setObservedEvents] = useState<ObservedEvent[]>([]);
+  const [assets, setAssets] = useState<ExposureAsset[]>([]);
+  const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>(
+    DEFAULT_LAYER_VISIBILITY,
+  );
+  const [showcaseMode, setShowcaseMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,12 +52,35 @@ function MapContent() {
       );
 
       try {
-        const res = await fetch(
-          `${API_URL}/api/v1/alerts${buildQuery({ ...filters, limit: 200 })}`,
-        );
-        if (!res.ok) throw new Error(`API error ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) setAlerts(data.items);
+        const [alertsRes, eventsRes, observedRes, assetsRes, healthRes] =
+          await Promise.all([
+            fetch(`${API_URL}/api/v1/alerts${buildQuery({ ...filters, limit: 200 })}`),
+            fetch(`${API_URL}/api/v1/events?active=true&limit=100`),
+            fetch(`${API_URL}/api/v1/observed-events?active=true&limit=100`),
+            fetch(`${API_URL}/api/v1/assets?limit=200`),
+            fetch(`${API_URL}/health`),
+          ]);
+
+        if (!alertsRes.ok) throw new Error(`API error ${alertsRes.status}`);
+
+        const [alertsData, eventsData, observedData, assetsData, healthData] =
+          await Promise.all([
+            alertsRes.json(),
+            eventsRes.ok ? eventsRes.json() : { items: [] },
+            observedRes.ok ? observedRes.json() : { items: [] },
+            assetsRes.ok ? assetsRes.json() : { items: [] },
+            healthRes.ok ? healthRes.json() : { showcase_mode: false },
+          ]);
+
+        if (!cancelled) {
+          setAlerts(alertsData.items);
+          setCanonicalEvents(eventsData.items ?? []);
+          setObservedEvents(observedData.items ?? []);
+          setAssets(assetsData.items ?? []);
+          setShowcaseMode(
+            (healthData as { showcase_mode?: boolean }).showcase_mode ?? false,
+          );
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Laden fehlgeschlagen");
@@ -66,10 +99,15 @@ function MapContent() {
 
   return (
     <div className="space-y-4">
+      <LayerControls
+        visibility={layerVisibility}
+        onChange={setLayerVisibility}
+        showcaseMode={showcaseMode}
+      />
       <Filters />
       {loading && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          Warnungen werden geladen…
+          Kartendaten werden geladen…
         </div>
       )}
       {error && (
@@ -77,7 +115,14 @@ function MapContent() {
           {error}
         </div>
       )}
-      <AlertMap alerts={alerts} />
+      <AlertMap
+        alerts={alerts}
+        canonicalEvents={canonicalEvents}
+        observedEvents={observedEvents}
+        assets={assets}
+        layerVisibility={layerVisibility}
+        showcaseMode={showcaseMode}
+      />
     </div>
   );
 }
@@ -88,8 +133,7 @@ export function MapPageClient() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Kartenansicht</h1>
         <p className="mt-1 text-slate-600">
-          Interaktive Weltkarte mit Warnungen nach Schweregrad. Klicken Sie auf
-          Marker für Details.
+          Multi-Layer-Karte mit Warnungen, Events, Observed Events und Exposure-Assets.
         </p>
       </div>
       <Suspense

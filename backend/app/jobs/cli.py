@@ -183,6 +183,25 @@ async def cmd_generate_implications(event_id: str | None = None) -> int:
         db.close()
 
 
+async def cmd_showcase_ingest() -> int:
+    db = SessionLocal()
+    try:
+        from app.services.showcase_service import run_showcase_ingest
+
+        run = await run_showcase_ingest(db, generate_briefing=True)
+        db.commit()
+        logger.info(
+            "Showcase ingest complete: status=%s fetched=%d created=%d updated=%d",
+            run.status,
+            run.alerts_fetched,
+            run.alerts_created,
+            run.alerts_updated,
+        )
+        return 0 if run.status in ("success", "partial") else 1
+    finally:
+        db.close()
+
+
 async def cmd_generate_briefing(briefing_type: str = "auto") -> int:
     db = SessionLocal()
     try:
@@ -223,6 +242,8 @@ def main() -> None:
 
     sub.add_parser("import-exposure", help="Import demo exposure asset fixtures")
 
+    sub.add_parser("showcase-ingest", help="Load curated showcase scenarios (SHOWCASE_MODE)")
+
     calc_parser = sub.add_parser("calculate-exposure", help="Calculate event asset exposures")
     calc_parser.add_argument("--event-id", help="Limit to a single canonical event UUID")
 
@@ -251,6 +272,8 @@ def main() -> None:
         code = asyncio.run(cmd_correlate())
     elif args.command == "import-exposure":
         code = asyncio.run(cmd_import_exposure())
+    elif args.command == "showcase-ingest":
+        code = asyncio.run(cmd_showcase_ingest())
     elif args.command == "calculate-exposure":
         code = asyncio.run(cmd_calculate_exposure(getattr(args, "event_id", None)))
     elif args.command == "generate-implications":

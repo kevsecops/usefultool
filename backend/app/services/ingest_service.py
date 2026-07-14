@@ -327,6 +327,11 @@ async def run_ingest(
     generate_briefing: bool | None = None,
 ) -> IngestRun:
     settings = get_settings()
+    if settings.showcase_mode:
+        from app.services.showcase_service import run_showcase_ingest
+
+        return await run_showcase_ingest(db, generate_briefing=generate_briefing)
+
     should_generate_briefing = (
         generate_briefing
         if generate_briefing is not None
@@ -335,7 +340,7 @@ async def run_ingest(
     now = utc_now()
     expired_count = deactivate_expired_alerts(db, now)
     fixture_count = 0
-    if not settings.demo_mode:
+    if not settings.demo_mode and not settings.showcase_mode:
         fixture_count = deactivate_fixture_alerts(db)
         if fixture_count:
             logger.info(

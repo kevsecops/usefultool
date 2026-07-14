@@ -1,6 +1,6 @@
 # Global Risk Intelligence MVP
 
-> **Status: Phase 7 — Live NINA & GDACS Sources**  
+> **Status: Phase 8 — Showcase Mode & Dashboard Extensions**  
 > PostgreSQL/PostGIS, Live ingest from **NINA (DE), GDACS (international), NOAA (US)** when `DEMO_MODE=false`, Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**, regelbasierter Global Risk Briefing (**LLM deaktiviert by default**).
 
 ## Produktbeschreibung
@@ -30,6 +30,8 @@
 **Showcase Phase 3:** NASA FIRMS thermal anomalies werden **während Ingest geclustert** — nur Aggregat-Cluster als `observed_events` (`active_fire_cluster`), nie einzelne Punkte. API: `GET /api/v1/fire-clusters`. Siehe [docs/firms-mapping.md](docs/firms-mapping.md), [docs/fire-clustering.md](docs/fire-clustering.md).
 
 **Showcase Phase 7:** LLM Evidence Package — erweiterte Briefings mit Observed Events, Verified Exposure, Evidence Gaps (`LLM_ENABLED=false` by default). Siehe [docs/llm-analysis.md](docs/llm-analysis.md).
+
+**Showcase Phase 8:** `SHOWCASE_MODE` — kuratierte Demoszenarien, Multi-Layer-Karte, Event-Detail, Dashboard-Erweiterungen. Siehe [docs/showcase.md](docs/showcase.md).
 
 Details: [docs/data-sources.md](docs/data-sources.md)
 
@@ -104,6 +106,21 @@ curl http://localhost:8000/api/v1/alerts
 curl "http://localhost:8000/api/v1/alerts?bounding_box=-98,32,-96,34&country=US"
 curl "http://localhost:8000/api/v1/alerts?country=DE"
 ```
+
+### Showcase-Modus (Demo ohne API-Keys)
+
+```bash
+# .env: SHOWCASE_MODE=true
+SHOWCASE_MODE=true docker compose up -d --build
+
+# Manuell laden
+docker compose exec backend python -m app.jobs.cli showcase-ingest
+
+curl http://localhost:8000/health   # showcase_mode: true
+open http://localhost:3000/events
+```
+
+Siehe [docs/showcase.md](docs/showcase.md) für die drei kuratierten Szenarien.
 
 ### Makefile-Hilfen
 

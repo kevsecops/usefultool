@@ -107,6 +107,10 @@ def get_health_status(db: Session) -> dict:
         "version": settings.app_version,
         "db": db_status,
         "demo_mode": settings.demo_mode,
+        "showcase_mode": settings.showcase_mode,
+        "ingest_mode": (
+            "showcase" if settings.showcase_mode else ("fixture" if settings.demo_mode else "live")
+        ),
         "scheduler": {
             "enabled": settings.scheduler_enabled,
             "interval_minutes": settings.ingest_interval_minutes,

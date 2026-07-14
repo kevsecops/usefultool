@@ -54,6 +54,17 @@ export default async function HomePage() {
         </div>
       )}
 
+      {!error && health?.showcase_mode && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+          <p className="font-medium">Showcase / Demo-Modus aktiv</p>
+          <p className="mt-1">
+            Angezeigte Daten stammen aus kuratierten Demoszenarien — keine externen
+            API-Schlüssel erforderlich.{" "}
+            <code className="rounded bg-violet-100 px-1">SHOWCASE_MODE=true</code>
+          </p>
+        </div>
+      )}
+
       {!error && health?.status === "degraded" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-medium">Daten-Pipeline beeinträchtigt</p>
@@ -91,6 +102,18 @@ export default async function HomePage() {
                 {formatDateTime(stats.last_ingest)}
               </p>
             )}
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <p className="text-sm text-slate-500">Canonical Events</p>
+            <p className="text-3xl font-bold text-slate-900">
+              {stats.canonical_event_count ?? health?.canonical_event_count ?? 0}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <p className="text-sm text-slate-500">Observed Events</p>
+            <p className="text-3xl font-bold text-slate-900">
+              {stats.observed_event_count ?? health?.active_observed_event_count ?? 0}
+            </p>
           </div>
         </div>
       </div>

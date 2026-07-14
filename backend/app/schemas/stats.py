@@ -37,3 +37,5 @@ class StatsResponse(BaseModel):
     hotspot_regions: list[HotspotRegion] = Field(default_factory=list)
     trend_anomalies: list[TrendAnomalyItem] = Field(default_factory=list)
     last_ingest: datetime | None = None
+    canonical_event_count: int = 0
+    observed_event_count: int = 0

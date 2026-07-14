@@ -3,6 +3,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.ingest_run import IngestRun
 from app.schemas.sources import SourceInfo, SourcesResponse
 from app.sources.registry import get_adapters
@@ -19,10 +20,14 @@ _SOURCE_NAMES = {
 
 
 async def get_sources(db: Session) -> SourcesResponse:
+    settings = get_settings()
     adapters = get_adapters()
     sources: list[SourceInfo] = []
     for adapter in adapters:
         health = await adapter.health_check()
+        if settings.showcase_mode:
+            health.ingest_mode = "showcase"
+            health.is_healthy = True
         last_fetch = db.scalar(
             select(func.max(IngestRun.finished_at)).where(
                 IngestRun.source.contains(adapter.source_id)

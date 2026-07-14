@@ -52,7 +52,8 @@ export function sourceLabel(source: AlertSource): string {
   return SOURCE_LABELS[source] ?? source;
 }
 
-export function ingestModeLabel(mode: "live" | "fixture" | undefined): string {
+export function ingestModeLabel(mode: "live" | "fixture" | "showcase" | undefined): string {
+  if (mode === "showcase") return "Showcase";
   return mode === "fixture" ? "Demo" : "Live";
 }
 

@@ -100,10 +100,13 @@ def get_asset(db: Session, asset_id: uuid.UUID) -> AssetResponse | None:
     return _asset_to_response(asset)
 
 
-def import_exposure_fixtures(db: Session) -> ImportExposureResponse:
-    """Load demo fixtures from fixtures/exposure/."""
-    settings = get_settings()
-    exposure_dir = settings.fixtures_dir / "exposure"
+def import_exposure_fixtures_from_dir(
+    db: Session,
+    exposure_dir: Path,
+    *,
+    source_label: str = "demo_fixture",
+) -> ImportExposureResponse:
+    """Load exposure asset fixtures from a directory."""
     created = 0
     updated = 0
     now = utc_now()
@@ -119,7 +122,7 @@ def import_exposure_fixtures(db: Session) -> ImportExposureResponse:
             source_asset_id = record["source_asset_id"]
             existing = db.scalar(
                 select(ExposureAsset).where(
-                    ExposureAsset.source == "demo_fixture",
+                    ExposureAsset.source == source_label,
                     ExposureAsset.source_asset_id == source_asset_id,
                 )
             )
@@ -152,7 +155,7 @@ def import_exposure_fixtures(db: Session) -> ImportExposureResponse:
                         longitude=lon,
                         geometry=geometry,
                         importance_level=record.get("importance_level", "medium"),
-                        source="demo_fixture",
+                        source=source_label,
                         source_url=None,
                         source_asset_id=source_asset_id,
                         metadata_=record.get("metadata"),
@@ -169,6 +172,12 @@ def import_exposure_fixtures(db: Session) -> ImportExposureResponse:
         assets_updated=updated,
         total_assets=total,
     )
+
+
+def import_exposure_fixtures(db: Session) -> ImportExposureResponse:
+    """Load demo fixtures from fixtures/exposure/."""
+    settings = get_settings()
+    return import_exposure_fixtures_from_dir(db, settings.fixtures_dir / "exposure")
 
 
 def calculate_exposure_for_event(

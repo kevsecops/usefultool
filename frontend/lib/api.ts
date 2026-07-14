@@ -3,6 +3,16 @@ import type { Stats } from "@/types/stats";
 import type { SourcesResponse } from "@/types/source";
 import type { Alert } from "@/types/alert";
 import type { Briefing, BriefingListResponse } from "@/types/briefing";
+import type {
+  CanonicalEvent,
+  CanonicalEventListResponse,
+  EventImplicationsResponse,
+  EventSourcesResponse,
+  FireClustersResponse,
+  ObservedEventListResponse,
+  SpaceWeatherResponse,
+} from "@/types/events";
+import type { AssetListResponse, EventExposureListResponse } from "@/types/exposure";
 
 export class ApiError extends Error {
   constructor(
@@ -64,7 +74,11 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
 export async function getHealth(): Promise<{
   status: string;
   demo_mode: boolean;
+  showcase_mode?: boolean;
+  ingest_mode?: string;
   last_ingest_error?: string | null;
+  canonical_event_count?: number;
+  active_observed_event_count?: number;
 }> {
   return apiFetch("/health");
 }
@@ -106,4 +120,105 @@ export async function getBriefings(
   offset = 0,
 ): Promise<BriefingListResponse> {
   return apiFetch(`/api/v1/briefings?limit=${limit}&offset=${offset}`);
+}
+
+export async function getObservedEvents(
+  params: {
+    source?: string;
+    category?: string;
+    severity?: string;
+    active?: boolean;
+    bounding_box?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<ObservedEventListResponse> {
+  const query = buildQuery({
+    source: params.source,
+    category: params.category,
+    severity: params.severity,
+    active: params.active ?? true,
+    bounding_box: params.bounding_box,
+    limit: params.limit ?? 100,
+    offset: params.offset ?? 0,
+  });
+  return apiFetch(`/api/v1/observed-events${query}`);
+}
+
+export async function getCanonicalEvents(
+  params: {
+    event_type?: string;
+    severity?: string;
+    status?: string;
+    active?: boolean;
+    bounding_box?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<CanonicalEventListResponse> {
+  const query = buildQuery({
+    event_type: params.event_type,
+    severity: params.severity,
+    status: params.status,
+    active: params.active ?? true,
+    bounding_box: params.bounding_box,
+    limit: params.limit ?? 100,
+    offset: params.offset ?? 0,
+  });
+  return apiFetch(`/api/v1/events${query}`);
+}
+
+export async function getEvent(id: string): Promise<CanonicalEvent> {
+  return apiFetch(`/api/v1/events/${id}`);
+}
+
+export async function getEventSources(id: string): Promise<EventSourcesResponse> {
+  return apiFetch(`/api/v1/events/${id}/sources`);
+}
+
+export async function getEventExposures(id: string): Promise<EventExposureListResponse> {
+  return apiFetch(`/api/v1/events/${id}/exposures`);
+}
+
+export async function getEventImplications(id: string): Promise<EventImplicationsResponse> {
+  return apiFetch(`/api/v1/events/${id}/implications`);
+}
+
+export async function getAssets(
+  params: {
+    asset_type?: string;
+    country_code?: string;
+    bounding_box?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<AssetListResponse> {
+  const query = buildQuery({
+    asset_type: params.asset_type,
+    country_code: params.country_code,
+    bounding_box: params.bounding_box,
+    limit: params.limit ?? 200,
+    offset: params.offset ?? 0,
+  });
+  return apiFetch(`/api/v1/assets${query}`);
+}
+
+export async function getFireClusters(
+  params: { active?: boolean; limit?: number } = {},
+): Promise<FireClustersResponse> {
+  const query = buildQuery({
+    active: params.active ?? true,
+    limit: params.limit ?? 50,
+  });
+  return apiFetch(`/api/v1/fire-clusters${query}`);
+}
+
+export async function getSpaceWeather(
+  params: { active?: boolean; limit?: number } = {},
+): Promise<SpaceWeatherResponse> {
+  const query = buildQuery({
+    active: params.active ?? true,
+    limit: params.limit ?? 50,
+  });
+  return apiFetch(`/api/v1/space-weather${query}`);
 }

@@ -75,7 +75,7 @@ export interface Alert {
   raw_payload?: Record<string, unknown> | null;
   fingerprint: string;
   is_active: boolean;
-  ingest_mode?: "live" | "fixture";
+  ingest_mode?: "live" | "fixture" | "showcase";
 }
 
 export interface ObservedEvent {
@@ -103,7 +103,7 @@ export interface ObservedEvent {
   source_metadata?: Record<string, unknown> | null;
   fingerprint: string;
   is_active: boolean;
-  ingest_mode?: "live" | "fixture";
+  ingest_mode?: "live" | "fixture" | "showcase";
 }
 
 export interface AlertListResponse {

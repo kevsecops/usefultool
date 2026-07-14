@@ -1,0 +1,32 @@
+[
+  {
+    "source_asset_id": "pp-gravelines",
+    "name": "Gravelines Nuclear Power Station",
+    "country_code": "FR",
+    "region": "Hauts-de-France",
+    "latitude": 51.0147,
+    "longitude": 2.1361,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 5460, "fuel": "nuclear", "operator": "EDF", "showcase": true}
+  },
+  {
+    "source_asset_id": "pp-belchatow",
+    "name": "Bełchatów Power Station",
+    "country_code": "PL",
+    "region": "Łódź",
+    "latitude": 51.2633,
+    "longitude": 19.3356,
+    "importance_level": "high",
+    "metadata": {"capacity_mw": 5472, "fuel": "coal", "operator": "PGE", "showcase": true}
+  },
+  {
+    "source_asset_id": "pp-diablo-canyon",
+    "name": "Diablo Canyon Power Plant",
+    "country_code": "US",
+    "region": "California",
+    "latitude": 35.2111,
+    "longitude": -120.8542,
+    "importance_level": "critical",
+    "metadata": {"capacity_mw": 2256, "fuel": "nuclear", "operator": "PG&E", "showcase": true}
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "source_asset_id": "port-la",
+    "name": "Port of Los Angeles",
+    "country_code": "US",
+    "region": "California",
+    "latitude": 33.7405,
+    "longitude": -118.2720,
+    "importance_level": "critical",
+    "metadata": {"un_locode": "USLAX", "annual_teu_millions": 9.0, "showcase": true}
+  },
+  {
+    "source_asset_id": "port-valencia",
+    "name": "Port of Valencia",
+    "country_code": "ES",
+    "region": "Valencia",
+    "latitude": 39.4528,
+    "longitude": -0.3256,
+    "importance_level": "critical",
+    "metadata": {"un_locode": "ESVLC", "annual_teu_millions": 5.2, "showcase": true}
+  },
+  {
+    "source_asset_id": "port-barcelona",
+    "name": "Port of Barcelona",
+    "country_code": "ES",
+    "region": "Catalonia",
+    "latitude": 41.3589,
+    "longitude": 2.1750,
+    "importance_level": "high",
+    "metadata": {"un_locode": "ESBCN", "annual_teu_millions": 3.5, "showcase": true}
+  }
+]

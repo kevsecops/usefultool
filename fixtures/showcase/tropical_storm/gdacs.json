@@ -1,0 +1,36 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [0.5, 39.5]
+      },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1551700,
+        "episodeid": 1718000,
+        "name": "Tropical Cyclone Medea — Western Mediterranean",
+        "alertlevel": "Red",
+        "alertscore": 3.8,
+        "severitydata": {
+          "severity": 3,
+          "severitytext": "Category 3",
+          "severityunit": ""
+        },
+        "country": "Spain",
+        "iso3": "ESP",
+        "fromdate": "2026-07-12T10:00:00",
+        "todate": "2026-07-18T10:00:00",
+        "datemodified": "2026-07-13T09:00:00",
+        "iscurrent": "true",
+        "description": "Category 3 tropical cyclone approaching Valencia and Barcelona coast — port operations at risk.",
+        "url": {
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=TC&eventid=1551700",
+          "report": "https://www.gdacs.org/report.aspx?eventid=1551700"
+        }
+      }
+    }
+  ]
+}

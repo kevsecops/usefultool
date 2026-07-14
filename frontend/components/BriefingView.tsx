@@ -156,6 +156,19 @@ export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProp
                       Letzter Abruf: {formatDateTime(sourceFetchById.get(item.source))}
                     </p>
                   )}
+                  {sources.find((s) => s.id === item.source)?.ingest_mode && (
+                    <span
+                      className={`mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-xs font-medium ${
+                        sources.find((s) => s.id === item.source)?.ingest_mode === "showcase"
+                          ? "bg-violet-100 text-violet-800"
+                          : sources.find((s) => s.id === item.source)?.ingest_mode === "fixture"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {sources.find((s) => s.id === item.source)?.ingest_mode}
+                    </span>
+                  )}
                 </div>
                 <span className="font-medium text-slate-900">{item.count}</span>
               </li>
@@ -342,6 +355,8 @@ export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProp
         </section>
       )}
 
+      <SourceHealthPanel sources={sources} />
+
       <div className="rounded-lg border border-slate-200 bg-slate-100 p-4 text-sm text-slate-600">
         <strong>Disclaimer:</strong>{" "}
         {isLlm
@@ -449,6 +464,51 @@ function ImplicationsSection({
             ),
         )}
       </div>
+    </section>
+  );
+}
+
+function SourceHealthPanel({ sources }: { sources: SourceInfo[] }) {
+  if (sources.length === 0) return null;
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <h3 className="mb-3 font-semibold text-slate-900">Quellen-Gesundheit</h3>
+      <ul className="space-y-2">
+        {sources.map((src) => (
+          <li key={src.id} className="flex items-center justify-between gap-4 text-sm">
+            <div>
+              <span className="text-slate-700">{src.name}</span>
+              {src.last_fetch && (
+                <p className="text-xs text-slate-400">
+                  Letzter Abruf: {formatDateTime(src.last_fetch)}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {src.ingest_mode && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    src.ingest_mode === "showcase"
+                      ? "bg-violet-100 text-violet-800"
+                      : src.ingest_mode === "fixture"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-emerald-100 text-emerald-800"
+                  }`}
+                >
+                  {src.ingest_mode}
+                </span>
+              )}
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  src.healthy ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                }`}
+              >
+                {src.healthy ? "OK" : "Fehler"}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

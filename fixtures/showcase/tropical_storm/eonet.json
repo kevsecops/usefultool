@@ -1,0 +1,43 @@
+{
+  "title": "EONET Showcase — Tropical Storm Medea",
+  "description": "Tropical cyclone track near Mediterranean ports (showcase fixture).",
+  "link": "https://eonet.gsfc.nasa.gov/api/v3/events",
+  "events": [
+    {
+      "id": "EONET_SHOWCASE_STORM",
+      "title": "Tropical Cyclone Medea, Western Mediterranean",
+      "description": "Category 3 tropical cyclone — Valencia and Barcelona ports within forecast cone.",
+      "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_SHOWCASE_STORM",
+      "closed": null,
+      "categories": [{ "id": "severeStorms", "title": "Severe Storms" }],
+      "sources": [{ "id": "GDACS", "url": "https://www.gdacs.org/" }],
+      "geometry": [
+        {
+          "magnitudeValue": 55.0,
+          "magnitudeUnit": "kts",
+          "date": "2026-07-11T18:00:00Z",
+          "type": "Point",
+          "coordinates": [-1.2, 36.5]
+        },
+        {
+          "magnitudeValue": 65.0,
+          "magnitudeUnit": "kts",
+          "date": "2026-07-12T06:00:00Z",
+          "type": "Point",
+          "coordinates": [0.2, 38.8]
+        },
+        {
+          "magnitudeValue": 75.0,
+          "magnitudeUnit": "kts",
+          "date": "2026-07-13T00:00:00Z",
+          "type": "LineString",
+          "coordinates": [
+            [0.2, 38.8],
+            [0.5, 39.5],
+            [1.0, 40.2]
+          ]
+        }
+      ]
+    }
+  ]
+}

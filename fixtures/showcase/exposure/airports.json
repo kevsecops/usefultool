@@ -1,0 +1,22 @@
+[
+  {
+    "source_asset_id": "apt-lax",
+    "name": "Los Angeles International Airport",
+    "country_code": "US",
+    "region": "California",
+    "latitude": 33.9425,
+    "longitude": -118.4081,
+    "importance_level": "critical",
+    "metadata": {"iata": "LAX", "icao": "KLAX", "annual_passengers_millions": 88, "showcase": true}
+  },
+  {
+    "source_asset_id": "apt-bcn",
+    "name": "Barcelona-El Prat Airport",
+    "country_code": "ES",
+    "region": "Catalonia",
+    "latitude": 41.2974,
+    "longitude": 2.0833,
+    "importance_level": "critical",
+    "metadata": {"iata": "BCN", "icao": "LEBL", "annual_passengers_millions": 50, "showcase": true}
+  }
+]

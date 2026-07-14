@@ -30,4 +30,6 @@ export interface Stats {
   hotspot_regions: HotspotRegion[];
   trend_anomalies: TrendAnomaly[];
   last_ingest: string | null;
+  canonical_event_count?: number;
+  observed_event_count?: number;
 }

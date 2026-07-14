@@ -7,7 +7,7 @@ from app.models.alert import Alert
 
 
 def is_fixture_alert(alert: Alert) -> bool:
-    """True when alert originated from demo fixtures."""
+    """True when alert originated from demo fixtures (not showcase)."""
     if alert.source_alert_id and "DEMO" in alert.source_alert_id.upper():
         return True
     raw = alert.raw_payload or {}
@@ -15,11 +15,18 @@ def is_fixture_alert(alert: Alert) -> bool:
     return mode == "fixture"
 
 
+def is_showcase_alert(alert: Alert) -> bool:
+    """True when alert originated from SHOWCASE_MODE curated fixtures."""
+    raw = alert.raw_payload or {}
+    mode = raw.get("_ingest_mode") or raw.get("ingest_mode")
+    return mode == "showcase"
+
+
 def extract_ingest_mode(alert: Alert) -> str:
     """Derive ingest mode label for API responses."""
     raw = alert.raw_payload or {}
     mode = raw.get("_ingest_mode") or raw.get("ingest_mode")
-    if mode in ("fixture", "live"):
+    if mode in ("fixture", "live", "showcase"):
         return mode
     if is_fixture_alert(alert):
         return "fixture"

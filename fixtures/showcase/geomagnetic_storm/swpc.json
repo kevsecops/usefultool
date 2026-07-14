@@ -1,0 +1,25 @@
+{
+  "alerts": [
+    {
+      "product_id": "K09A",
+      "issue_datetime": "2026-07-13T18:03:00Z",
+      "message": "Space Weather Message Code: ALTK09\r\nSerial Number: 2100\r\nIssue Time: 2026 Jul 13 1803 UTC\r\n\r\nALERT: Geomagnetic K-index of 8 \nThreshold Reached: 2026 Jul 13 1759 UTC\nSynoptic Period: 1500-1800\nActive Warning: YES\nNoaa Scale: G4 - Severe\nComment: \r\n\nNOAA Scale: G4 - Severe\r\n\r\nNOAA Space Weather Scale descriptions can be found at\r\nwww.swpc.noaa.gov/noaa-scales-explanation\r\n\r\nPotential Impacts: Area of impact primarily poleward of 50 degrees Geomagnetic Latitude.\r\nInduced Currents - Possible widespread voltage problems and power grid instability.\r\nSpacecraft - Systems may experience surface charging; increased drag on low Earth-orbit satellites.\r\nAurora - Aurora may be seen as low as Pennsylvania to Iowa to Oregon."
+    }
+  ],
+  "scales": {
+    "-1": {
+      "DateStamp": "2026-07-13",
+      "TimeStamp": "18:00:00",
+      "R": { "Scale": "2", "Text": "moderate", "MinorProb": null, "MajorProb": null },
+      "S": { "Scale": "1", "Text": "minor", "Prob": null },
+      "G": { "Scale": "4", "Text": "severe" }
+    },
+    "0": {
+      "DateStamp": "2026-07-14",
+      "TimeStamp": "12:00:00",
+      "R": { "Scale": "1", "Text": "minor", "MinorProb": null, "MajorProb": null },
+      "S": { "Scale": "0", "Text": "none", "Prob": null },
+      "G": { "Scale": "3", "Text": "strong" }
+    }
+  }
+}

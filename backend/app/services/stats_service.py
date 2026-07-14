@@ -10,7 +10,9 @@ from app.analysis.risk_score import compute_global_risk_score
 from app.analysis.trends import detect_trend_anomalies, global_rolling_avg
 from app.core.config import get_settings
 from app.models.alert import Alert
+from app.models.canonical_event import CanonicalEvent
 from app.models.ingest_run import IngestRun
+from app.models.observed_event import ObservedEvent
 from app.normalization.datetime_utils import utc_now
 from app.schemas.stats import CountryCount, HotspotRegion, StatsResponse, TrendAnomalyItem
 from app.services.alert_active import filter_effectively_active
@@ -63,6 +65,18 @@ def get_stats(db: Session) -> StatsResponse:
     ]
 
     last_ingest = db.scalar(select(func.max(IngestRun.finished_at)))
+    canonical_count = (
+        db.scalar(
+            select(func.count()).select_from(CanonicalEvent).where(CanonicalEvent.is_active.is_(True))
+        )
+        or 0
+    )
+    observed_count = (
+        db.scalar(
+            select(func.count()).select_from(ObservedEvent).where(ObservedEvent.is_active.is_(True))
+        )
+        or 0
+    )
 
     return StatsResponse(
         active_count=len(active_alerts),
@@ -85,4 +99,6 @@ def get_stats(db: Session) -> StatsResponse:
             for a in anomalies
         ],
         last_ingest=last_ingest,
+        canonical_event_count=canonical_count,
+        observed_event_count=observed_count,
     )

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     log_format: str = "json"
     database_url: str = "postgresql://postgres:postgres@localhost:5432/usefultool"
     demo_mode: bool = False
+    showcase_mode: bool = False
     fixtures_dir: Path = Path("fixtures")
     admin_token: str = "dev-admin-token"
     frontend_url: str = "http://localhost:3000"
