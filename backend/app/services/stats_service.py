@@ -5,9 +5,10 @@ from collections import Counter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.analysis.clustering import clusters_to_bonus_details, detect_hotspots
+from app.analysis.clustering import detect_hotspots
 from app.analysis.risk_score import compute_global_risk_score
-from app.analysis.trends import detect_trend_anomalies, global_rolling_avg
+from app.analysis.trends import detect_trend_anomalies
+from app.services.risk_score_service import gather_risk_inputs
 from app.core.config import get_settings
 from app.models.alert import Alert
 from app.models.canonical_event import CanonicalEvent
@@ -40,14 +41,8 @@ def get_stats(db: Session) -> StatsResponse:
         by_source[alert.source] += 1
 
     hotspots = detect_hotspots(active_alerts)
-    cluster_bonuses = clusters_to_bonus_details(hotspots)
-    rolling_avg = global_rolling_avg(active_alerts, now=now)
-    risk = compute_global_risk_score(
-        active_alerts,
-        now=now,
-        cluster_bonuses=cluster_bonuses,
-        rolling_avg_active=rolling_avg,
-    )
+    risk_inputs = gather_risk_inputs(db, active_alerts)
+    risk = compute_global_risk_score(inputs=risk_inputs, now=now)
     anomalies = detect_trend_anomalies(active_alerts, now=now)
 
     top_countries = [

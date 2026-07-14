@@ -1,274 +1,394 @@
-"""Transparent global risk score (0-100) with documented weighting.
+"""Transparent global risk score v2 (0-100) with documented multi-factor weighting.
 
 See docs/risk-scoring.md for the full specification.
 """
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
-from shapely.geometry import shape
-
-from app.core.config import get_settings
 from app.models.alert import Alert
+from app.models.canonical_event import CanonicalEvent
+from app.models.event_asset_exposure import EventAssetExposure
+from app.models.exposure_asset import ExposureAsset
+from app.models.implication_candidate import ImplicationCandidate
 
-# Stage 1: severity base weights
-SEVERITY_WEIGHTS: dict[str, int] = {
-    "minor": 1,
-    "moderate": 3,
-    "severe": 6,
-    "extreme": 10,
-    "unknown": 1,
+SCORE_VERSION = "2"
+
+# --- Factor caps ---
+EVENT_SEVERITY_CAP = 40
+INFRASTRUCTURE_EXPOSURE_CAP = 30
+MULTI_SOURCE_CAP = 15
+HUMANITARIAN_IMPACT_CAP = 15
+
+# --- Event severity (canonical events; alert fallback uses reduced weights) ---
+EVENT_SEVERITY_WEIGHTS: dict[str, float] = {
+    "minor": 2,
+    "moderate": 6,
+    "severe": 12,
+    "extreme": 20,
+    "unknown": 2,
 }
 
-# Stage 2: per-alert modifiers
-URGENCY_MODIFIERS: dict[str, float] = {
-    "immediate": 1.5,
-    "expected": 1.2,
+ALERT_FALLBACK_SEVERITY_WEIGHTS: dict[str, float] = {
+    "minor": 0.5,
+    "moderate": 2,
+    "severe": 5,
+    "extreme": 8,
+    "unknown": 0.5,
 }
 
-CERTAINTY_MODIFIERS: dict[str, float] = {
-    "observed": 1.3,
-    "likely": 1.1,
+CONFIDENCE_MODIFIERS: dict[str, float] = {
+    "low": 0.7,
+    "medium": 1.0,
+    "high": 1.2,
+    "unknown": 1.0,
 }
 
-GEO_AREA_THRESHOLDS_KM2: list[tuple[float, float]] = [
-    (50_000, 1.5),
-    (10_000, 1.2),
-]
+# --- Infrastructure exposure ---
+ASSET_TYPE_WEIGHTS: dict[str, float] = {
+    "port": 3,
+    "airport": 2,
+    "power_plant": 4,
+}
 
-DURATION_MODIFIERS_HOURS: list[tuple[int, float]] = [
-    (7 * 24, 1.2),
-    (48, 1.1),
-]
+IMPORTANCE_MODIFIERS: dict[str, float] = {
+    "low": 0.5,
+    "medium": 1.0,
+    "high": 1.5,
+    "critical": 2.0,
+}
 
-MODERATE_PLUS = frozenset({"moderate", "severe", "extreme"})
+EXPOSURE_TYPE_MODIFIERS: dict[str, float] = {
+    "inside_event_area": 1.0,
+    "near_event_area": 0.5,
+    "system_level_exposure": 0.7,
+    "unknown": 0.4,
+}
 
+EXPOSURE_CONFIDENCE_MODIFIERS: dict[str, float] = {
+    "low": 0.7,
+    "medium": 1.0,
+    "high": 1.2,
+}
 
-@dataclass
-class AlertScoreDetail:
-    alert_id: str
-    base_weight: int
-    urgency_mod: float
-    certainty_mod: float
-    geo_mod: float
-    duration_mod: float
-    alert_score: float
-    area_km2: float | None = None
+# --- Humanitarian / impact implications ---
+IMPACT_EVIDENCE_WEIGHTS: dict[str, float] = {
+    "officially_reported": 5,
+    "observed": 4,
+    "inferred_from_exposure": 3,
+    "hypothesis": 0,
+}
 
+IMPACT_CATEGORIES = frozenset({"humanitarian", "public_health", "infrastructure", "energy"})
 
-@dataclass
-class ClusterBonusDetail:
-    region: str
-    bonus: float
-    alert_ids: list[str]
-    severe_or_extreme_count: int
-    moderate_count: int
+SEVERITY_RANK = {"extreme": 4, "severe": 3, "moderate": 2, "minor": 1, "unknown": 0}
 
 
 @dataclass
 class RiskScoreResult:
     global_score: int
     raw_total: float
-    trend_modifier: float
-    alert_scores: list[AlertScoreDetail] = field(default_factory=list)
-    cluster_bonuses: list[ClusterBonusDetail] = field(default_factory=list)
+    trend_modifier: float = 1.0
+    alert_scores: list = field(default_factory=list)
+    cluster_bonuses: list = field(default_factory=list)
     breakdown: dict[str, Any] = field(default_factory=dict)
 
 
-def _geometry_area_km2(alert: Alert) -> float | None:
-    geojson = alert.geometry_json
-    if not geojson:
-        return None
-    try:
-        geom = shape(geojson)
-        # Approximate area in km² using equirectangular projection at centroid latitude
-        centroid = geom.centroid
-        lat_rad = centroid.y * 3.14159265 / 180.0
-        area_deg2 = abs(geom.area)
-        km_per_deg_lat = 111.32
-        km_per_deg_lon = 111.32 * abs(__import__("math").cos(lat_rad))
-        return area_deg2 * km_per_deg_lat * km_per_deg_lon
-    except Exception:
-        return None
+@dataclass
+class RiskScoreInputs:
+    alerts: list[Alert] = field(default_factory=list)
+    canonical_events: list[CanonicalEvent] = field(default_factory=list)
+    event_exposures: list[EventAssetExposure] = field(default_factory=list)
+    implications: list[ImplicationCandidate] = field(default_factory=list)
 
 
-def _geo_modifier(area_km2: float | None) -> float:
-    if area_km2 is None:
-        return 1.0
-    mod = 1.0
-    for threshold, multiplier in GEO_AREA_THRESHOLDS_KM2:
-        if area_km2 > threshold:
-            mod = multiplier
-    return mod
+def _diminishing_sum(scores: list[float], decay: float = 0.65) -> float:
+    """Sum scores with exponential decay so additional events add less."""
+    if not scores:
+        return 0.0
+    total = 0.0
+    for idx, score in enumerate(scores):
+        total += score * (decay**idx)
+    return total
 
 
-def _duration_modifier(alert: Alert, now: datetime) -> float:
-    start = alert.effective_at or alert.issued_at
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=now.tzinfo)
-    hours_active = (now - start).total_seconds() / 3600
-    mod = 1.0
-    for threshold_hours, multiplier in DURATION_MODIFIERS_HOURS:
-        if hours_active > threshold_hours:
-            mod = multiplier
-    return mod
+def _event_contribution(severity: str, confidence: str, *, use_alerts: bool = False) -> float:
+    weights = ALERT_FALLBACK_SEVERITY_WEIGHTS if use_alerts else EVENT_SEVERITY_WEIGHTS
+    base = weights.get(severity, weights["unknown"])
+    conf_mod = CONFIDENCE_MODIFIERS.get(confidence, 1.0)
+    return base * conf_mod
 
 
-def compute_alert_score(alert: Alert, now: datetime) -> AlertScoreDetail:
-    """Stage 1+2: base weight × urgency × certainty × geo × duration."""
-    base = SEVERITY_WEIGHTS.get(alert.severity, 1)
-    urgency_mod = URGENCY_MODIFIERS.get(alert.urgency or "", 1.0)
-    certainty_mod = CERTAINTY_MODIFIERS.get(alert.certainty or "", 1.0)
-    area_km2 = _geometry_area_km2(alert)
-    geo_mod = _geo_modifier(area_km2)
-    duration_mod = _duration_modifier(alert, now)
-    score = base * urgency_mod * certainty_mod * geo_mod * duration_mod
-    return AlertScoreDetail(
-        alert_id=str(alert.id),
-        base_weight=base,
-        urgency_mod=urgency_mod,
-        certainty_mod=certainty_mod,
-        geo_mod=geo_mod,
-        duration_mod=duration_mod,
-        alert_score=round(score, 2),
-        area_km2=round(area_km2, 2) if area_km2 is not None else None,
-    )
-
-
-def _region_label(alert: Alert) -> str:
-    if alert.region and alert.country_code:
-        return f"{alert.region}, {alert.country_code}"
-    if alert.country_code:
-        return alert.country_code
-    if alert.location_name:
-        return alert.location_name
-    return "unknown"
-
-
-def compute_cluster_bonuses(
+def compute_event_severity_index(
+    canonical_events: list[CanonicalEvent],
     alerts: list[Alert],
-    cluster_details: list[ClusterBonusDetail] | None = None,
-) -> list[ClusterBonusDetail]:
-    """Stage 3: regional cluster bonus from pre-computed hotspots."""
-    if cluster_details is not None:
-        return cluster_details
-    # Fallback: country+region grouping for moderate+ alerts
-    from collections import defaultdict
-
-    groups: dict[str, list[Alert]] = defaultdict(list)
-    for alert in alerts:
-        if alert.severity in MODERATE_PLUS:
-            groups[_region_label(alert)].append(alert)
-
-    bonuses: list[ClusterBonusDetail] = []
-    for region, group in groups.items():
-        if len(group) < 3:
-            continue
-        severe_extreme = sum(1 for a in group if a.severity in ("severe", "extreme"))
-        moderate = sum(1 for a in group if a.severity == "moderate")
-        bonus = severe_extreme * 2 + moderate * 1
-        bonuses.append(
-            ClusterBonusDetail(
-                region=region,
-                bonus=float(bonus),
-                alert_ids=[str(a.id) for a in group],
-                severe_or_extreme_count=severe_extreme,
-                moderate_count=moderate,
-            )
+) -> tuple[float, dict[str, Any]]:
+    """Factor 1: Event Severity Index (0-40)."""
+    if canonical_events:
+        contributions = [
+            _event_contribution(event.severity, event.confidence)
+            for event in canonical_events
+        ]
+        source = "canonical_events"
+        event_count = len(canonical_events)
+    else:
+        ranked_alerts = sorted(
+            alerts,
+            key=lambda a: (
+                SEVERITY_RANK.get(a.severity, 0),
+                a.issued_at,
+            ),
+            reverse=True,
         )
-    return bonuses
+        contributions = [
+            _event_contribution(a.severity, a.certainty or "medium", use_alerts=True)
+            for a in ranked_alerts[:5]
+        ]
+        source = "alert_fallback"
+        event_count = len(contributions)
+
+    contributions.sort(reverse=True)
+    raw = _diminishing_sum(contributions)
+    # Reference: one extreme high-confidence event ≈ 24; three severe events ≈ ~28 raw
+    reference_max = 28.0
+    index = min(EVENT_SEVERITY_CAP, round(raw * EVENT_SEVERITY_CAP / reference_max))
+
+    detail = {
+        "source": source,
+        "event_count": event_count,
+        "raw_contribution": round(raw, 2),
+        "top_contributions": [round(c, 2) for c in contributions[:5]],
+        "index": index,
+        "cap": EVENT_SEVERITY_CAP,
+    }
+    return float(index), detail
 
 
-def compute_trend_modifier(current_count: int, rolling_avg: float) -> float:
-    """Stage 4: compare active alerts vs 7-day rolling average."""
-    if rolling_avg <= 0:
-        return 1.0 if current_count == 0 else 1.3
-    ratio = current_count / rolling_avg
-    if ratio < 0.8:
-        return 0.9
-    if ratio <= 1.2:
-        return 1.0
-    if ratio <= 1.5:
-        return 1.1
-    if ratio <= 2.0:
-        return 1.2
-    return 1.3
+def compute_infrastructure_exposure_index(
+    exposures: list[EventAssetExposure],
+) -> tuple[float, dict[str, Any]]:
+    """Factor 2: Infrastructure Exposure Index (0-30)."""
+    if not exposures:
+        return 0.0, {
+            "exposure_count": 0,
+            "unique_assets": 0,
+            "raw_contribution": 0,
+            "index": 0,
+            "cap": INFRASTRUCTURE_EXPOSURE_CAP,
+        }
+
+    asset_scores: dict[str, float] = {}
+    asset_details: list[dict[str, Any]] = []
+
+    for exposure in exposures:
+        asset: ExposureAsset | None = exposure.asset
+        if asset is None:
+            continue
+
+        type_weight = ASSET_TYPE_WEIGHTS.get(asset.asset_type, 1)
+        importance_mod = IMPORTANCE_MODIFIERS.get(asset.importance_level, 1.0)
+        overlap_mod = (
+            1.0
+            if exposure.overlap
+            else EXPOSURE_TYPE_MODIFIERS.get(exposure.exposure_type, 0.4)
+        )
+        conf_mod = EXPOSURE_CONFIDENCE_MODIFIERS.get(exposure.confidence, 1.0)
+        score = type_weight * importance_mod * overlap_mod * conf_mod
+
+        asset_key = str(asset.id)
+        if score > asset_scores.get(asset_key, 0):
+            asset_scores[asset_key] = score
+            asset_details.append(
+                {
+                    "asset_id": asset_key,
+                    "asset_name": asset.name,
+                    "asset_type": asset.asset_type,
+                    "importance_level": asset.importance_level,
+                    "exposure_type": exposure.exposure_type,
+                    "overlap": exposure.overlap,
+                    "score": round(score, 2),
+                }
+            )
+
+    ranked = sorted(asset_scores.values(), reverse=True)
+    raw = _diminishing_sum(ranked, decay=0.6)
+    # Reference: two critical ports inside event area ≈ 18 raw
+    reference_max = 20.0
+    index = min(INFRASTRUCTURE_EXPOSURE_CAP, round(raw * INFRASTRUCTURE_EXPOSURE_CAP / reference_max))
+
+    detail = {
+        "exposure_count": len(exposures),
+        "unique_assets": len(asset_scores),
+        "raw_contribution": round(raw, 2),
+        "top_assets": sorted(asset_details, key=lambda d: d["score"], reverse=True)[:5],
+        "index": index,
+        "cap": INFRASTRUCTURE_EXPOSURE_CAP,
+    }
+    return float(index), detail
+
+
+def compute_multi_source_corroboration(
+    canonical_events: list[CanonicalEvent],
+) -> tuple[float, dict[str, Any]]:
+    """Factor 3: Multi-Source Corroboration (0-15)."""
+    if not canonical_events:
+        return 0.0, {
+            "corroborated_events": 0,
+            "index": 0,
+            "cap": MULTI_SOURCE_CAP,
+            "events": [],
+        }
+
+    event_details: list[dict[str, Any]] = []
+    total_bonus = 0.0
+
+    for event in canonical_events:
+        sources: set[str] = set()
+        for link in event.links or []:
+            sources.add(f"{link.member_type}:{link.member_id}")
+
+        source_count = len(sources)
+        if source_count < 2:
+            continue
+
+        bonus = min(5.0, (source_count - 1) * 2.0)
+        total_bonus += bonus
+        event_details.append(
+            {
+                "event_id": str(event.id),
+                "title": event.title,
+                "source_count": source_count,
+                "bonus": round(bonus, 2),
+            }
+        )
+
+    index = min(MULTI_SOURCE_CAP, round(total_bonus))
+
+    detail = {
+        "corroborated_events": len(event_details),
+        "raw_contribution": round(total_bonus, 2),
+        "events": event_details,
+        "index": index,
+        "cap": MULTI_SOURCE_CAP,
+    }
+    return float(index), detail
+
+
+def compute_humanitarian_impact_signal(
+    implications: list[ImplicationCandidate],
+    canonical_events: list[CanonicalEvent],
+) -> tuple[float, dict[str, Any]]:
+    """Factor 4: Humanitarian/Impact Signal (0-15)."""
+    if not implications:
+        return 0.0, {
+            "qualifying_implications": 0,
+            "raw_contribution": 0,
+            "index": 0,
+            "cap": HUMANITARIAN_IMPACT_CAP,
+            "implications": [],
+        }
+
+    severity_by_event = {str(e.id): e.severity for e in canonical_events}
+    implication_scores: list[float] = []
+    implication_details: list[dict[str, Any]] = []
+
+    for impl in implications:
+        evidence_weight = IMPACT_EVIDENCE_WEIGHTS.get(impl.evidence_level, 0)
+        if evidence_weight <= 0:
+            continue
+
+        conf_mod = CONFIDENCE_MODIFIERS.get(impl.confidence, 1.0)
+        category_mod = 1.5 if impl.category in IMPACT_CATEGORIES else 1.0
+        event_severity = severity_by_event.get(str(impl.canonical_event_id), "moderate")
+        severity_mod = 1.0 + SEVERITY_RANK.get(event_severity, 0) * 0.1
+
+        score = evidence_weight * conf_mod * category_mod * severity_mod
+        implication_scores.append(score)
+        implication_details.append(
+            {
+                "implication_id": str(impl.id),
+                "title": impl.title,
+                "category": impl.category,
+                "evidence_level": impl.evidence_level,
+                "confidence": impl.confidence,
+                "score": round(score, 2),
+            }
+        )
+
+    implication_scores.sort(reverse=True)
+    raw = _diminishing_sum(implication_scores, decay=0.7)
+    reference_max = 12.0
+    index = min(HUMANITARIAN_IMPACT_CAP, round(raw * HUMANITARIAN_IMPACT_CAP / reference_max))
+
+    detail = {
+        "qualifying_implications": len(implication_details),
+        "raw_contribution": round(raw, 2),
+        "top_implications": sorted(implication_details, key=lambda d: d["score"], reverse=True)[:5],
+        "index": index,
+        "cap": HUMANITARIAN_IMPACT_CAP,
+    }
+    return float(index), detail
 
 
 def compute_global_risk_score(
-    alerts: list[Alert],
+    alerts: list[Alert] | None = None,
     *,
+    canonical_events: list[CanonicalEvent] | None = None,
+    event_exposures: list[EventAssetExposure] | None = None,
+    implications: list[ImplicationCandidate] | None = None,
+    inputs: RiskScoreInputs | None = None,
     now: datetime | None = None,
-    cluster_bonuses: list[ClusterBonusDetail] | None = None,
+    # Legacy kwargs — ignored in v2, kept for call-site compatibility during migration
+    cluster_bonuses: list | None = None,
     trend_modifier: float | None = None,
     rolling_avg_active: float | None = None,
 ) -> RiskScoreResult:
-    """Compute normalized global risk score (0-100) with full breakdown."""
-    settings = get_settings()
+    """Compute normalized global risk score (0-100) with transparent v2 breakdown."""
+    del cluster_bonuses, trend_modifier, rolling_avg_active
     now = now or datetime.now(UTC)
 
-    alert_details = [compute_alert_score(a, now) for a in alerts]
-    alert_total = sum(d.alert_score for d in alert_details)
+    if inputs is not None:
+        alerts = inputs.alerts
+        canonical_events = inputs.canonical_events
+        event_exposures = inputs.event_exposures
+        implications = inputs.implications
 
-    clusters = compute_cluster_bonuses(alerts, cluster_bonuses)
-    cluster_total = sum(c.bonus for c in clusters)
+    alerts = alerts or []
+    canonical_events = canonical_events or []
+    event_exposures = event_exposures or []
+    implications = implications or []
 
-    raw_total = alert_total + cluster_total
+    event_idx, event_detail = compute_event_severity_index(canonical_events, alerts)
+    infra_idx, infra_detail = compute_infrastructure_exposure_index(event_exposures)
+    corroboration_idx, corroboration_detail = compute_multi_source_corroboration(canonical_events)
+    impact_idx, impact_detail = compute_humanitarian_impact_signal(implications, canonical_events)
 
-    if trend_modifier is None:
-        avg = rolling_avg_active if rolling_avg_active is not None else len(alerts)
-        trend_modifier = compute_trend_modifier(len(alerts), avg)
-
-    scaling = settings.risk_score_scaling
-    # scaling_factor calibrates sensitivity: at default (50), score ≈ raw_total
-    normalized = min(100, round(raw_total * trend_modifier * 50 / scaling))
+    raw_total = event_idx + infra_idx + corroboration_idx + impact_idx
+    global_score = min(100, round(raw_total))
 
     breakdown: dict[str, Any] = {
-        "alert_score_sum": round(alert_total, 2),
-        "cluster_bonus_sum": round(cluster_total, 2),
+        "version": SCORE_VERSION,
+        "computed_at": now.isoformat(),
+        "event_severity_index": event_detail,
+        "infrastructure_exposure_index": infra_detail,
+        "multi_source_corroboration": corroboration_detail,
+        "humanitarian_impact_signal": impact_detail,
+        "factor_totals": {
+            "event_severity": event_idx,
+            "infrastructure_exposure": infra_idx,
+            "multi_source_corroboration": corroboration_idx,
+            "humanitarian_impact": impact_idx,
+        },
         "raw_total": round(raw_total, 2),
-        "trend_modifier": trend_modifier,
-        "scaling_factor": scaling,
-        "active_count": len(alerts),
-        "alert_details": [
-            {
-                "alert_id": d.alert_id,
-                "base_weight": d.base_weight,
-                "urgency_mod": d.urgency_mod,
-                "certainty_mod": d.certainty_mod,
-                "geo_mod": d.geo_mod,
-                "duration_mod": d.duration_mod,
-                "area_km2": d.area_km2,
-                "alert_score": d.alert_score,
-            }
-            for d in alert_details
-        ],
-        "cluster_bonuses": [
-            {
-                "region": c.region,
-                "bonus": c.bonus,
-                "alert_ids": c.alert_ids,
-                "severe_or_extreme_count": c.severe_or_extreme_count,
-                "moderate_count": c.moderate_count,
-            }
-            for c in clusters
-        ],
+        "active_alert_count": len(alerts),
+        "canonical_event_count": len(canonical_events),
     }
 
     return RiskScoreResult(
-        global_score=normalized,
+        global_score=global_score,
         raw_total=raw_total,
-        trend_modifier=trend_modifier,
-        alert_scores=alert_details,
-        cluster_bonuses=clusters,
         breakdown=breakdown,
     )
-
-
-def alert_duration_hours(alert: Alert, now: datetime) -> float:
-    start = alert.effective_at or alert.issued_at
-    return (now - start).total_seconds() / 3600

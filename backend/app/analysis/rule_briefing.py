@@ -129,9 +129,16 @@ def _build_summary(
     by_source: list[dict[str, Any]],
     top_countries: list[dict[str, Any]],
 ) -> str:
+    factors = risk.breakdown.get("factor_totals", {})
     parts = [
         f"{len(alerts)} aktive Warnung{'en' if len(alerts) != 1 else ''} weltweit.",
-        f"Global Risk Score: {risk.global_score}/100.",
+        f"Global Risk Score: {risk.global_score}/100",
+        (
+            f"(Schwere: {int(factors.get('event_severity', 0))}, "
+            f"Infrastruktur: {int(factors.get('infrastructure_exposure', 0))}, "
+            f"Quellen: {int(factors.get('multi_source_corroboration', 0))}, "
+            f"Auswirkung: {int(factors.get('humanitarian_impact', 0))})."
+        ),
     ]
     source_text = _format_source_counts(by_source)
     if source_text:

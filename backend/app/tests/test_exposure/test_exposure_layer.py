@@ -407,3 +407,18 @@ def test_api_exposure_analysis(client, db_session) -> None:
     data = response.json()
     assert data["event_id"] == str(event.id)
     assert data["total"] >= 1
+
+
+def test_airports_fixture_includes_cgn(db_session) -> None:
+    """Demo airport fixture must include Cologne/Bonn (CGN) and major EU hubs."""
+    import json
+    from pathlib import Path
+
+    fixture_path = Path(__file__).resolve().parents[4] / "fixtures" / "exposure" / "airports.json"
+    airports = json.loads(fixture_path.read_text())
+    iata_codes = {a["metadata"]["iata"] for a in airports}
+
+    assert "CGN" in iata_codes
+    for code in ("MUC", "DUS", "BER", "FRA"):
+        assert code in iata_codes
+    assert len(airports) >= 25

@@ -75,7 +75,11 @@ async def test_stats_global_risk_score(client, db_session) -> None:
     data = response.json()
     assert data["active_count"] > 0
     assert data["global_risk_score"] > 0
-    assert "alert_score_sum" in data["score_breakdown"]
+    assert data["global_risk_score"] < 100
+    breakdown = data["score_breakdown"]
+    assert breakdown["version"] == "2"
+    assert "factor_totals" in breakdown
+    assert "event_severity_index" in breakdown
     assert "trend_anomalies" in data
 
 

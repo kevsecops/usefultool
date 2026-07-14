@@ -8,10 +8,10 @@ from datetime import datetime
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
-from app.analysis.clustering import clusters_to_bonus_details, detect_hotspots
+from app.analysis.clustering import detect_hotspots
 from app.analysis.risk_score import compute_global_risk_score
 from app.analysis.rule_briefing import SOURCE_LABELS, build_by_source, generate_rule_briefing
-from app.analysis.trends import detect_trend_anomalies, global_rolling_avg
+from app.analysis.trends import detect_trend_anomalies
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.llm.analyzer import LLMAnalysisError, generate_llm_briefing_content
@@ -30,6 +30,7 @@ from app.normalization.datetime_utils import utc_now
 from app.schemas.common import BriefingType
 from app.services.alert_active import filter_effectively_active
 from app.services.alert_fixture import is_fixture_alert
+from app.services.risk_score_service import gather_risk_inputs
 
 logger = get_logger(__name__)
 
@@ -191,14 +192,8 @@ def generate_briefing(
 def _collect_analysis_context(db: Session, alerts: list[Alert], now):
     """Shared stats/hotspots/anomalies/risk computation."""
     hotspots = detect_hotspots(alerts)
-    cluster_bonuses = clusters_to_bonus_details(hotspots)
-    rolling_avg = global_rolling_avg(alerts, now=now)
-    risk = compute_global_risk_score(
-        alerts,
-        now=now,
-        cluster_bonuses=cluster_bonuses,
-        rolling_avg_active=rolling_avg,
-    )
+    risk_inputs = gather_risk_inputs(db, alerts)
+    risk = compute_global_risk_score(inputs=risk_inputs, now=now)
     anomalies = detect_trend_anomalies(alerts, now=now)
     return hotspots, risk, anomalies
 

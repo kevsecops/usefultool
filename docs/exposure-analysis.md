@@ -16,17 +16,22 @@ All assets in `fixtures/exposure/` are **demo fixtures for showcase purposes onl
 | File | Count | Asset type | License / source note |
 |------|-------|------------|----------------------|
 | `ports.json` | 12 | `port` | Publicly known major port names and approximate coordinates; not a production maritime database |
-| `airports.json` | 13 | `airport` | Publicly known IATA airports with approximate WGS84 coordinates; not an aviation authority dataset |
+| `airports.json` | 30 | `airport` | Publicly known IATA airports with approximate WGS84 coordinates; **curated demo subset**, not a complete global aviation database |
 | `power_plants.json` | 10 | `power_plant` | Well-known large facilities for demo narrative; not a complete generation asset registry |
 
 **Do not treat these as authoritative global infrastructure inventories.** They exist to
-demonstrate geospatial exposure logic in the MVP showcase.
+demonstrate geospatial exposure logic in the MVP showcase. The airport fixture includes
+major hubs across regions (e.g. CGN, MUC, DUS, BER in Germany; ATL, LAX, SFO in the US)
+but omits thousands of regional airports by design.
 
 Import via:
 
 ```bash
 python -m app.jobs.cli import-exposure
 ```
+
+Showcase ingest (`python -m app.jobs.cli showcase-ingest`) also reloads exposure fixtures
+from `fixtures/exposure/` per `fixtures/showcase/manifest.json`.
 
 ## Data Model
 

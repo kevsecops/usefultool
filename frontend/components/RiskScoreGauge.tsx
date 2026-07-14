@@ -7,9 +7,10 @@ interface RiskScoreGaugeProps {
 }
 
 function scoreLabel(score: number): string {
-  if (score >= 75) return "Kritisch";
-  if (score >= 50) return "Erhöht";
-  if (score >= 25) return "Moderat";
+  if (score >= 81) return "Kritisch";
+  if (score >= 61) return "Hoch";
+  if (score >= 41) return "Erhöht";
+  if (score >= 21) return "Moderat";
   return "Niedrig";
 }
 
@@ -17,13 +18,15 @@ export function RiskScoreGauge({ score, size = "lg" }: RiskScoreGaugeProps) {
   const clamped = Math.max(0, Math.min(100, score));
   const rotation = (clamped / 100) * 180 - 90;
   const severity: Severity =
-    clamped >= 75
+    clamped >= 81
       ? "extreme"
-      : clamped >= 50
+      : clamped >= 61
         ? "severe"
-        : clamped >= 25
+        : clamped >= 41
           ? "moderate"
-          : "minor";
+          : clamped >= 21
+            ? "minor"
+            : "minor";
   const color = severityColor(severity);
   const isLarge = size === "lg";
 

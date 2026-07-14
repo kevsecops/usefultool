@@ -1,169 +1,188 @@
-# Regelbasierte Risiko-Bewertung (Risk Scoring)
+# Global Risk Score v2
 
-> **Status:** Phase 5 implementiert  
-> **Disclaimer:** Der Score ist ein heuristischer Aggregationsindikator, keine wissenschaftliche Risikobewertung.
+> **Status:** Phase 8 — multi-factor scoring  
+> **Disclaimer:** The score is a heuristic aggregation indicator, not a scientific risk assessment.
 
-## Ziel
+## Goal
 
-Ein transparenter, nachvollziehbarer **Global Risk Score** (0–100) auf Basis normalisierter Warnungen und berechneter Statistiken. Dient als Dashboard-KPI und als Input für regelbasiertes sowie LLM-Briefing.
+A transparent, explainable **Global Risk Score** (0–100) that reflects **event severity, infrastructure exposure, and corroborated impact signals** — not raw alert count. Used as a dashboard KPI and input for rule-based and LLM briefings.
 
-**Implementierung:** `backend/app/analysis/risk_score.py`
+**Implementation:** `backend/app/analysis/risk_score.py` (version `2`)
 
-## Score-Berechnung
+## Why v2?
 
-### Stufe 1: Alert-Level Score
+The v1 model summed per-alert weights and cluster bonuses, then scaled by active alert count. With dozens of live NOAA/NWS warnings worldwide, `raw_total` routinely exceeded the normalization ceiling and the score **saturated at 100** regardless of actual impact.
 
-Jede aktive Warnung erhält einen Basis-Score:
+v2 replaces alert-count scaling with four capped factors derived from canonical events, asset exposures, multi-source corroboration, and implication evidence.
 
-| Severity | Gewicht |
-|----------|---------|
-| `minor` | 1 |
-| `moderate` | 3 |
-| `severe` | 6 |
-| `extreme` | 10 |
-| `unknown` | 1 |
-
-### Stufe 2: Modifikatoren (pro Alert)
-
-| Faktor | Bedingung | Multiplikator |
-|--------|-----------|---------------|
-| Urgency | `immediate` | ×1.5 |
-| Urgency | `expected` | ×1.2 |
-| Certainty | `observed` | ×1.3 |
-| Certainty | `likely` | ×1.1 |
-| Geo-Extent | Polygon > 10.000 km² | ×1.2 |
-| Geo-Extent | Polygon > 50.000 km² | ×1.5 |
-| Duration | Aktiv > 48h | ×1.1 |
-| Duration | Aktiv > 7d | ×1.2 |
+## Score Formula (v2)
 
 ```
-alert_score = base_weight × urgency_mod × certainty_mod × geo_mod × duration_mod
+global_score = min(100,
+    event_severity_index          (0–40)
+  + infrastructure_exposure_index (0–30)
+  + multi_source_corroboration    (0–15)
+  + humanitarian_impact_signal    (0–15)
+)
 ```
 
-Geo-Fläche wird aus `geometry_json` via Shapely berechnet (equirectangular Näherung am Zentroid).
+Each factor uses **diminishing returns** so additional events/assets add progressively less — preventing saturation from volume alone.
 
-Dauer basiert auf `effective_at` oder `issued_at` bis `now`.
+### Factor 1: Event Severity Index (0–40)
 
-### Stufe 3: Regionaler Cluster-Bonus
+**Primary source:** active canonical events (`severity` + `confidence`).
 
-Implementierung: `backend/app/analysis/clustering.py`
+| Severity | Weight |
+|----------|--------|
+| `minor` | 2 |
+| `moderate` | 6 |
+| `severe` | 12 |
+| `extreme` | 20 |
 
-Hotspots werden erkannt wenn in einem **100 km Radius** (oder gleichem Land+Region, oder Land+Kategorie) ≥3 aktive Warnungen mit `severity >= moderate` (bzw. severe+ für räumliche/Kategorie-Cluster):
+| Confidence | Multiplier |
+|------------|------------|
+| `low` | ×0.7 |
+| `medium` | ×1.0 |
+| `high` | ×1.2 |
+
+Per-event contribution = `severity_weight × confidence_mod`. Contributions are sorted descending and summed with exponential decay (`0.65^rank`). Result is scaled to 0–40 (reference max ≈ 28 raw).
+
+**Alert fallback:** When no canonical events exist, only the **top 5 alerts** by severity contribute, using reduced weights (severe=5, extreme=8, etc.). This prevents hundreds of minor weather advisories from dominating the score.
+
+### Factor 2: Infrastructure Exposure Index (0–30)
+
+Based on `event_asset_exposures` for active canonical events, deduplicated per asset (highest score wins).
+
+| Asset type | Weight |
+|------------|--------|
+| `port` | 3 |
+| `airport` | 2 |
+| `power_plant` | 4 |
+
+| Importance | Multiplier |
+|------------|------------|
+| `low` | ×0.5 |
+| `medium` | ×1.0 |
+| `high` | ×1.5 |
+| `critical` | ×2.0 |
+
+| Exposure type | Multiplier |
+|---------------|------------|
+| `inside_event_area` / overlap | ×1.0 |
+| `near_event_area` | ×0.5 |
+| `system_level_exposure` | ×0.7 |
 
 ```
-cluster_bonus = count(severe_or_extreme) × 2 + count(moderate) × 1
+asset_score = type_weight × importance_mod × overlap_mod × confidence_mod
 ```
 
-### Stufe 4: Trend-Modifikator
+Diminishing sum (decay 0.6) → scaled to 0–30.
 
-Implementierung: `backend/app/analysis/trends.py`
+### Factor 3: Multi-Source Corroboration (0–15)
 
-Vergleich aktive Warnungen vs. gleitender 7-Tage-Durchschnitt (basierend auf `ingested_at` im Fenster):
-
-| Verhältnis (aktuell / Ø7d) | Modifikator |
-|----------------------------|-------------|
-| < 0.8 | ×0.9 (Rückgang) |
-| 0.8 – 1.2 | ×1.0 |
-| 1.2 – 1.5 | ×1.1 |
-| 1.5 – 2.0 | ×1.2 |
-| > 2.0 | ×1.3 (ungewöhnliche Häufung) |
-
-Spikes (>150% des Durchschnitts) werden zusätzlich als `trend_anomalies` in Stats/Briefing exponiert.
-
-### Stufe 5: Aggregation → Global Score
+For each active canonical event with **≥2 linked sources** (alerts, observed events):
 
 ```
-raw_total = Σ(alert_score) + Σ(cluster_bonus)
-normalized = min(100, round(raw_total × trend_mod × 50 / scaling_factor))
+bonus = min(5, (source_count − 1) × 2)
 ```
 
-**`scaling_factor`:** Kalibrierbar via Env `RISK_SCORE_SCALING` (Default: `50`).  
-Bei Default und `trend_mod=1` entspricht der Score etwa `raw_total` (bis 100).  
-Bei 10 aktiven `severe`-Warnungen ohne Modifikatoren: `10 × 6 = 60` → Score ≈ 60.
+Summed across corroborated events, capped at 15.
 
-### Score-Interpretation (UI)
+### Factor 4: Humanitarian / Impact Signal (0–15)
 
-| Bereich | Label | Farbe |
-|---------|-------|-------|
-| 0–20 | Low | Grün |
-| 21–40 | Moderate | Gelb |
+From `implication_candidates` with qualifying evidence:
+
+| Evidence level | Weight |
+|----------------|--------|
+| `officially_reported` | 5 |
+| `observed` | 4 |
+| `inferred_from_exposure` | 3 |
+| `hypothesis` | 0 (excluded) |
+
+Multiplied by confidence modifier and a 1.5× boost for `humanitarian`, `public_health`, `infrastructure`, `energy` categories. Diminishing sum → scaled to 0–15.
+
+## Score Interpretation (UI)
+
+| Range | Label | Color |
+|-------|-------|-------|
+| 0–20 | Low | Green |
+| 21–40 | Moderate | Yellow |
 | 41–60 | Elevated | Orange |
-| 61–80 | High | Rot |
-| 81–100 | Critical | Dunkelrot |
+| 61–80 | High | Red |
+| 81–100 | Critical | Dark red |
 
-## Statistiken (regelbasierte Analyse)
+## Expected Ranges
 
-`GET /api/v1/stats` liefert:
+| Scenario | Typical score |
+|----------|---------------|
+| No active events | 0 |
+| Many minor live alerts, no canonical events | 5–20 |
+| Showcase (3 events + exposures + corroboration) | 40–70 |
+| Extreme multi-source crisis with critical exposures | 80–100 (rare) |
 
-| Metrik | Beschreibung |
-|--------|--------------|
-| `active_count` | Anzahl `is_active=true` |
-| `global_risk_score` | Normalisierter Score 0–100 |
-| `score_breakdown` | Vollständige Zusammensetzung inkl. Alert-Details |
-| `by_country` | Dict `{country_code: count}` |
-| `by_category` | Dict `{category: count}` |
-| `by_severity` | Dict `{severity: count}` |
-| `top_countries` | Top 10 nach Count |
-| `hotspot_regions` | Regionen mit ≥3 moderate+ (inkl. max_severity) |
-| `trend_anomalies` | Ungewöhnliche Spikes vs. 7-Tage-Ø |
-| `last_ingest` | Letzter erfolgreicher IngestRun |
+## API
 
-## Regelbasiertes Fallback-Briefing
+`GET /api/v1/stats` returns:
 
-Implementierung: `backend/app/analysis/rule_briefing.py`, Persistenz via `backend/app/services/briefing_service.py`
+| Field | Description |
+|-------|-------------|
+| `global_risk_score` | Normalized score 0–100 |
+| `score_breakdown` | v2 breakdown with `version: "2"`, per-factor details |
+| `canonical_event_count` | Active canonical events used in scoring |
+
+### Breakdown structure
 
 ```json
 {
-  "generated_at": "2026-07-13T10:00:00Z",
-  "type": "rule_based",
-  "overall_risk_score": 42,
-  "overall_confidence": "medium",
-  "summary": "42 aktive Warnungen weltweit. Global Risk Score: 42/100. Schwerpunkt: Texas, US (5 Warnungen, max. severe).",
-  "affected_regions": [
-    {"region": "Texas, US", "alert_count": 5, "max_severity": "severe", "alert_ids": ["..."]}
-  ],
-  "major_events": [
-    {"title": "...", "severity": "severe", "source": "noaa", "alert_id": "..."}
-  ],
-  "cross_border_patterns": [],
-  "trend_anomalies": [],
-  "potential_implications": {
-    "economy": [],
-    "logistics": ["Mögliche Beeinträchtigung von Straßen..."],
-    "infrastructure": [],
-    "technology": [],
-    "finance": []
+  "version": "2",
+  "factor_totals": {
+    "event_severity": 28,
+    "infrastructure_exposure": 18,
+    "multi_source_corroboration": 6,
+    "humanitarian_impact": 8
   },
-  "limitations": [
-    "Regelbasierte Zusammenfassung ohne semantische Interpretation.",
-    "Keine wirtschaftlichen Prognosen — nur konservative Hypothesen."
-  ],
-  "source_alert_ids": ["..."]
+  "event_severity_index": { "source": "canonical_events", "index": 28, ... },
+  "infrastructure_exposure_index": { "unique_assets": 3, "index": 18, ... },
+  "multi_source_corroboration": { "corroborated_events": 1, "index": 6, ... },
+  "humanitarian_impact_signal": { "qualifying_implications": 2, "index": 8, ... }
 }
 ```
 
-**API:**
-- `GET /api/v1/briefings/latest`
-- `GET /api/v1/briefings?limit=20&offset=0`
-- `POST /api/v1/admin/generate-briefing` (Header `X-Admin-Token`)
-- CLI: `python -m app.jobs.cli generate-briefing`
+## Data Loading
 
-## Konfiguration
+`backend/app/services/risk_score_service.py` → `gather_risk_inputs(db, alerts)` loads:
 
-| Env-Variable | Default | Beschreibung |
-|--------------|---------|--------------|
-| `RISK_SCORE_SCALING` | `50` | Normalisierungsfaktor |
-| `RISK_CLUSTER_RADIUS_KM` | `100` | Hotspot-Radius |
-| `RISK_TREND_WINDOW_DAYS` | `7` | Trend-Fenster |
+- Active canonical events (with links)
+- Event–asset exposures for those events (with asset details)
+- All implication candidates
 
-## Transparenz-Anforderungen
+Used by `stats_service` and `briefing_service`.
 
-- Score-Zusammensetzung in API `GET /api/v1/stats` als `score_breakdown` exponiert
-- Jeder Modifikator mit Begründung und betroffenen Alert-IDs in `alert_details` / `cluster_bonuses`
-- Im Dashboard: Tooltip „Wie wird der Score berechnet?“ mit Link zu diesem Dokument
+## Briefing Integration
 
-## Nicht-Ziele
+Rule-based briefing summaries include factor breakdown:
 
-- Keine probabilistische Schadensabschätzung
-- Keine Versicherungs-/Finanzrisiko-Scores
-- Kein Ersatz für behördliche Warnstufen
+> Global Risk Score: 52/100 (Schwere: 28, Infrastruktur: 18, Quellen: 6, Auswirkung: 8).
+
+## v1 → v2 Migration Notes
+
+Removed from scoring (still computed for stats display):
+
+- Per-alert linear summation
+- Regional cluster bonuses
+- Trend modifier on alert count
+
+`RISK_SCORE_SCALING` env var is **no longer used** in v2.
+
+## Transparency Requirements
+
+- Full `score_breakdown` in `GET /api/v1/stats`
+- Dashboard tooltip linking to this document
+- Each factor exposes top contributing events/assets/implications
+
+## Non-Goals
+
+- No population-weighted regional impact (no population dataset yet)
+- No probabilistic damage modeling
+- No insurance/financial risk scores
+- Not a replacement for official warning levels
