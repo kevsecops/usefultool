@@ -93,9 +93,35 @@ docker compose exec backend python -m app.jobs.cli generate-briefing --type auto
 
 Migrationen laufen beim Backend-Start automatisch (`docker-entrypoint.sh`). Postgres, Backend und Frontend haben Healthchecks; das Frontend startet erst, wenn die API healthy ist.
 
-**Nach Code-Änderungen:** `docker compose up -d --build` oder `make rebuild` (vollständiger No-Cache-Rebuild).
-
 **Logs:** `docker compose logs -f frontend backend` oder `make logs`.
+
+### Entwicklung mit Auto-Reload (empfohlen)
+
+Für lokale Entwicklung **kein manuelles Rebuild** nach Code-Änderungen nötig:
+
+```bash
+cp .env.example .env   # falls noch nicht vorhanden
+make dev
+# oder im Vordergrund mit Compose Watch:
+make dev-watch
+```
+
+| Was | Verhalten |
+|-----|-----------|
+| Python (`backend/app/`) | Uvicorn `--reload` — Neustart bei `.py`-Änderungen |
+| Frontend (TSX/CSS/…) | Next.js Dev Server (`npm run dev`) — Hot Reload |
+| Postgres | unverändert (Daten bleiben im Volume) |
+
+**Einmalig starten, dann weiter coden** — Änderungen an Anwendungscode werden automatisch übernommen.
+
+**Rebuild/Rebuild nötig bei:**
+
+- `backend/pyproject.toml` / neue Python-Dependencies → `make dev` (baut Backend neu)
+- `frontend/package.json` / neue npm-Pakete → `make dev` (baut Frontend neu)
+- `backend/Dockerfile` oder `frontend/Dockerfile*` geändert → `make dev`
+- Neue Alembic-Migrationen → `docker compose -f docker-compose.yml -f docker-compose.dev.yml restart backend` (Migrationen laufen beim Start)
+
+**Production / Demo-Deploy** (kein Hot Reload): `docker compose up -d --build` oder `make up` / `make rebuild`.
 
 **API-URLs in Containern:** Der Browser nutzt `NEXT_PUBLIC_API_URL=http://localhost:8000`. Server Components und SSR im Next.js-Container nutzen `API_URL=http://backend:8000` (siehe `frontend/lib/api.ts`).
 
@@ -132,7 +158,11 @@ Siehe [docs/showcase.md](docs/showcase.md) für die drei kuratierten Szenarien.
 
 | Target | Aktion |
 |--------|--------|
-| `make up` | `.env` anlegen falls fehlend, `docker compose up -d --build` |
+| `make dev` | Dev-Stack mit Hot Reload (`docker-compose.dev.yml`), detached |
+| `make dev-watch` | Wie `make dev`, Vordergrund + Compose Watch (sync/rebuild) |
+| `make dev-logs` | Logs im Dev-Stack folgen |
+| `make dev-down` | Dev-Stack stoppen |
+| `make up` | Production-Stack: `.env` anlegen falls fehlend, `docker compose up -d --build` |
 | `make ingest` | Demo-Fixture-Ingest im Backend-Container |
 | `make logs` | Frontend- und Backend-Logs folgen |
 | `make rebuild` | `down`, `build --no-cache`, `up -d` |
