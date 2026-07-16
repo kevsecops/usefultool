@@ -167,7 +167,11 @@ def generate_llm_briefing_content(
                     schema_hint=SCHEMA_HINT,
                 )
             else:
-                correction = build_correction_prompt(last_error, last_output)
+                correction = build_correction_prompt(
+                    last_error,
+                    last_output,
+                    original_user_prompt=user_prompt,
+                )
                 raw = provider.complete_json(
                     system_prompt=SYSTEM_PROMPT,
                     user_prompt=correction,

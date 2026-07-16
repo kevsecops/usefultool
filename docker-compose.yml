@@ -37,9 +37,7 @@ services:
       LOG_LEVEL: INFO
       FIXTURES_DIR: /app/fixtures
       FRONTEND_URL: http://localhost:3000
-      LLM_ENABLED: "false"
-      LLM_PROVIDER: mock
-      LLM_MODEL: gpt-4o-mini
+      # LLM_* from .env (do not override here — user enables via LLM_ENABLED=true)
       SOURCES_LIVE: "nina,gdacs,noaa"
       NINA_USER_AGENT: "GlobalRiskIntelligence/1.0 (contact@example.com)"
       NINA_BASE_URL: "https://warnung.bund.de/api31"

@@ -70,9 +70,11 @@ def build_user_prompt(analysis_input: dict[str, Any]) -> str:
     )
 
 
-def build_correction_prompt(errors: str, previous_output: str) -> str:
+def build_correction_prompt(errors: str, previous_output: str, *, original_user_prompt: str) -> str:
     """Build retry prompt after validation failure."""
     return (
         CORRECTION_PROMPT.format(errors=errors)
         + f"\n\nPrevious invalid output:\n{previous_output[:2000]}"
+        + "\n\nRe-analyze the original input below and return corrected JSON only.\n\n"
+        + original_user_prompt
     )
