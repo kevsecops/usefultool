@@ -1,7 +1,7 @@
 import type { Briefing } from "@/types/briefing";
 import type { Stats } from "@/types/stats";
 import type { SourceInfo } from "@/types/source";
-import { categoryLabel, formatDateTime, sourceLabel } from "@/lib/format";
+import { categoryLabel, formatDateTime, ingestModeBadgeClass, ingestModeLabel, sourceHealthBadgeClass, sourceHealthLabel, sourceLabel } from "@/lib/format";
 import { distinctSourceCount, resolveBySource } from "@/lib/briefing";
 import Link from "next/link";
 
@@ -9,6 +9,8 @@ interface BriefingViewProps {
   briefing: Briefing | null;
   stats: Stats;
   sources?: SourceInfo[];
+  demoMode?: boolean;
+  showcaseMode?: boolean;
 }
 
 const CONFIDENCE_LABELS: Record<string, string> = {
@@ -31,7 +33,13 @@ function snapshotRiskScore(briefing: Briefing): number {
   return briefing.content.overall_risk_score ?? briefing.overall_risk_score;
 }
 
-export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProps) {
+export function BriefingView({
+  briefing,
+  stats,
+  sources = [],
+  demoMode = false,
+  showcaseMode = false,
+}: BriefingViewProps) {
   if (!briefing) {
     return (
       <div className="space-y-6">
@@ -158,15 +166,21 @@ export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProp
                   )}
                   {sources.find((s) => s.id === item.source)?.ingest_mode && (
                     <span
-                      className={`mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-xs font-medium ${
-                        sources.find((s) => s.id === item.source)?.ingest_mode === "showcase"
-                          ? "bg-violet-100 text-violet-800"
-                          : sources.find((s) => s.id === item.source)?.ingest_mode === "fixture"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-emerald-100 text-emerald-800"
-                      }`}
+                      className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${ingestModeBadgeClass(
+                        sources.find((s) => s.id === item.source)?.ingest_mode,
+                      )}`}
                     >
-                      {sources.find((s) => s.id === item.source)?.ingest_mode}
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          sources.find((s) => s.id === item.source)?.ingest_mode === "showcase"
+                            ? "bg-violet-500"
+                            : sources.find((s) => s.id === item.source)?.ingest_mode === "fixture"
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
+                        }`}
+                        aria-hidden
+                      />
+                      {ingestModeLabel(sources.find((s) => s.id === item.source)?.ingest_mode)}
                     </span>
                   )}
                 </div>
@@ -355,7 +369,11 @@ export function BriefingView({ briefing, stats, sources = [] }: BriefingViewProp
         </section>
       )}
 
-      <SourceHealthPanel sources={sources} />
+      <SourceHealthPanel
+        sources={sources}
+        demoMode={demoMode}
+        showcaseMode={showcaseMode}
+      />
 
       <div className="rounded-lg border border-slate-200 bg-slate-100 p-4 text-sm text-slate-600">
         <strong>Disclaimer:</strong>{" "}
@@ -468,49 +486,154 @@ function ImplicationsSection({
   );
 }
 
-function SourceHealthPanel({ sources }: { sources: SourceInfo[] }) {
+const DEFAULT_LIVE_SOURCES = ["nina", "gdacs", "noaa"];
+
+function SourceHealthPanel({
+  sources,
+  demoMode,
+  showcaseMode,
+}: {
+  sources: SourceInfo[];
+  demoMode: boolean;
+  showcaseMode: boolean;
+}) {
   if (sources.length === 0) return null;
+
+  const fixtureSources = sources.filter((s) => s.ingest_mode === "fixture");
+  const hasSourcesLiveFixture =
+    !demoMode && !showcaseMode && fixtureSources.some((s) => !DEFAULT_LIVE_SOURCES.includes(s.id));
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="mb-3 font-semibold text-slate-900">Quellen-Gesundheit</h3>
-      <ul className="space-y-2">
-        {sources.map((src) => (
-          <li key={src.id} className="flex items-center justify-between gap-4 text-sm">
-            <div>
-              <span className="text-slate-700">{src.name}</span>
-              {src.last_fetch && (
-                <p className="text-xs text-slate-400">
-                  Letzter Abruf: {formatDateTime(src.last_fetch)}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {src.ingest_mode && (
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    src.ingest_mode === "showcase"
-                      ? "bg-violet-100 text-violet-800"
-                      : src.ingest_mode === "fixture"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-emerald-100 text-emerald-800"
-                  }`}
-                >
-                  {src.ingest_mode}
-                </span>
-              )}
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  src.healthy ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                }`}
-              >
-                {src.healthy ? "OK" : "Fehler"}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <h3 className="mb-1 font-semibold text-slate-900">Quellen-Gesundheit</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        Erreichbarkeit und Datenmodus jeder angebundenen Quelle.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+              <th scope="col" className="pb-2 pr-4 font-medium">
+                Quelle
+              </th>
+              <th scope="col" className="pb-2 pr-4 font-medium">
+                Datenmodus
+              </th>
+              <th scope="col" className="pb-2 pr-4 font-medium">
+                Status
+              </th>
+              <th scope="col" className="pb-2 font-medium">
+                Letzter Abruf
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sources.map((src) => (
+              <tr key={src.id} className="border-b border-slate-100 last:border-0">
+                <td className="py-2 pr-4 text-slate-700">{src.name}</td>
+                <td className="py-2 pr-4">
+                  {src.ingest_mode ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${ingestModeBadgeClass(src.ingest_mode)}`}
+                      title={ingestModeTooltip(src.ingest_mode)}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          src.ingest_mode === "showcase"
+                            ? "bg-violet-500"
+                            : src.ingest_mode === "fixture"
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
+                        }`}
+                        aria-hidden
+                      />
+                      {ingestModeLabel(src.ingest_mode)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${sourceHealthBadgeClass(src.healthy)}`}
+                    title={
+                      src.healthy
+                        ? "Letzter Abruf oder Health-Check erfolgreich"
+                        : "Quelle nicht erreichbar oder Fixture fehlt"
+                    }
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        src.healthy ? "bg-green-500" : "bg-red-500"
+                      }`}
+                      aria-hidden
+                    />
+                    {sourceHealthLabel(src.healthy)}
+                  </span>
+                </td>
+                <td className="py-2 text-slate-500">{formatDateTime(src.last_fetch)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 space-y-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+        <div>
+          <p className="font-medium text-slate-700">Datenmodus</p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            <li>
+              <strong>Live-Daten</strong> — Abruf von der echten externen API
+            </li>
+            <li>
+              <strong>Demo-Daten (Fixture)</strong> — lokale JSON-Testdateien, kein Live-Abruf
+            </li>
+            <li>
+              <strong>Showcase</strong> — kuratierte Demo-Szenarien für Präsentationen
+            </li>
+          </ul>
+        </div>
+        <div>
+          <p className="font-medium text-slate-700">Status</p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            <li>
+              <strong>Erreichbar</strong> — letzter Abruf oder Health-Check erfolgreich
+            </li>
+            <li>
+              <strong>Nicht erreichbar</strong> — API antwortet nicht oder Demo-Datei fehlt
+            </li>
+          </ul>
+        </div>
+        {demoMode && (
+          <p className="text-amber-800">
+            <strong>Hinweis:</strong> DEMO_MODE ist aktiv — alle Quellen verwenden Demo-Daten
+            (Fixtures), unabhängig von SOURCES_LIVE.
+          </p>
+        )}
+        {showcaseMode && (
+          <p className="text-violet-800">
+            <strong>Hinweis:</strong> SHOWCASE_MODE ist aktiv — kuratierte Demo-Szenarien statt
+            Live- oder Fixture-Daten.
+          </p>
+        )}
+        {hasSourcesLiveFixture && (
+          <p className="text-amber-800">
+            <strong>Hinweis:</strong> Quellen wie USGS, EONET, NOAA SWPC und NASA FIRMS zeigen
+            „Demo-Daten“, weil sie nicht in <code className="rounded bg-amber-100 px-1">SOURCES_LIVE</code>{" "}
+            enthalten sind (Standard: nina, gdacs, noaa). Für Live-Abruf z. B.{" "}
+            <code className="rounded bg-amber-100 px-1">SOURCES_LIVE=nina,gdacs,noaa,usgs,eonet</code>{" "}
+            setzen.
+          </p>
+        )}
+      </div>
     </section>
   );
+}
+
+function ingestModeTooltip(mode: string | null | undefined): string {
+  if (mode === "live") return "Daten werden von der echten externen API abgerufen";
+  if (mode === "fixture") return "Daten stammen aus lokalen JSON-Demo-Dateien";
+  if (mode === "showcase") return "Kuratierte Demo-Szenarien für Präsentationen";
+  return "";
 }
 
 function StatsFallback({ stats }: { stats: Stats }) {

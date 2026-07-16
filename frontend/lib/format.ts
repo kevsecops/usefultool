@@ -52,9 +52,31 @@ export function sourceLabel(source: AlertSource): string {
   return SOURCE_LABELS[source] ?? source;
 }
 
-export function ingestModeLabel(mode: "live" | "fixture" | "showcase" | undefined): string {
+export type IngestMode = "live" | "fixture" | "showcase";
+
+export function ingestModeLabel(
+  mode: IngestMode | string | undefined | null,
+): string {
   if (mode === "showcase") return "Showcase";
-  return mode === "fixture" ? "Demo" : "Live";
+  if (mode === "fixture") return "Demo-Daten (Fixture)";
+  if (mode === "live") return "Live-Daten";
+  return "Unbekannt";
+}
+
+export function ingestModeBadgeClass(
+  mode: IngestMode | string | undefined | null,
+): string {
+  if (mode === "showcase") return "bg-violet-100 text-violet-800";
+  if (mode === "fixture") return "bg-amber-100 text-amber-800";
+  return "bg-emerald-100 text-emerald-800";
+}
+
+export function sourceHealthLabel(healthy: boolean): string {
+  return healthy ? "Erreichbar" : "Nicht erreichbar";
+}
+
+export function sourceHealthBadgeClass(healthy: boolean): string {
+  return healthy ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
