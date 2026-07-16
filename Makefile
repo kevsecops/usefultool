@@ -42,4 +42,6 @@ health:
 	@curl -sf -o /dev/null -w "frontend HTTP %{http_code}\n" http://localhost:3000/
 
 test-backend:
-	docker compose exec backend pytest -v
+	docker compose exec \
+		-e PYTEST_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/usefultool_test \
+		backend pytest -v

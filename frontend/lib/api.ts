@@ -36,15 +36,24 @@ function getBaseUrl(): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${getBaseUrl()}${path}`;
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...init?.headers,
-    },
-    next: { revalidate: 30 },
-  });
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        ...init?.headers,
+      },
+      next: { revalidate: 30 },
+    });
+  } catch {
+    throw new ApiError(
+      `Backend nicht erreichbar unter ${baseUrl} — läuft \`docker compose up\`?`,
+      0,
+    );
+  }
 
   if (!response.ok) {
     let detail = response.statusText;

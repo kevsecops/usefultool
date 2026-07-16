@@ -52,16 +52,31 @@ function MapContent() {
       );
 
       try {
-        const [alertsRes, eventsRes, observedRes, assetsRes, healthRes] =
-          await Promise.all([
+        let alertsRes: Response;
+        try {
+          [alertsRes] = await Promise.all([
             fetch(`${API_URL}/api/v1/alerts${buildQuery({ ...filters, limit: 200 })}`),
-            fetch(`${API_URL}/api/v1/events?active=true&limit=100`),
-            fetch(`${API_URL}/api/v1/observed-events?active=true&limit=100`),
-            fetch(`${API_URL}/api/v1/assets?limit=200`),
-            fetch(`${API_URL}/health`),
           ]);
+        } catch {
+          throw new Error(
+            `Backend nicht erreichbar unter ${API_URL} — läuft \`docker compose up\`?`,
+          );
+        }
 
-        if (!alertsRes.ok) throw new Error(`API error ${alertsRes.status}`);
+        const [eventsRes, observedRes, assetsRes, healthRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/events?active=true&limit=100`),
+          fetch(`${API_URL}/api/v1/observed-events?active=true&limit=100`),
+          fetch(`${API_URL}/api/v1/assets?limit=200`),
+          fetch(`${API_URL}/health`),
+        ]);
+
+        if (!alertsRes.ok) {
+          throw new Error(
+            alertsRes.status >= 500
+              ? `Backend-Fehler (${alertsRes.status}) — Datenbank-Schema prüfen: docker compose restart backend`
+              : `API-Fehler ${alertsRes.status}`,
+          );
+        }
 
         const [alertsData, eventsData, observedData, assetsData, healthData] =
           await Promise.all([
