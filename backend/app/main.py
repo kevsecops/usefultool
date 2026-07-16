@@ -11,9 +11,7 @@ from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 from app.db.session import SessionLocal
 from app.jobs.scheduler import start_scheduler, stop_scheduler
-from app.services.alert_fixture import deactivate_fixture_alerts
-from app.services.showcase_service import ensure_showcase_data
-from app.services.ingest_service import deactivate_expired_alerts
+from app.services.startup_service import run_startup_pipeline
 
 setup_logging()
 settings = get_settings()
@@ -24,24 +22,11 @@ logger = get_logger(__name__)
 async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
-        expired = deactivate_expired_alerts(db)
+        await run_startup_pipeline(db)
         db.commit()
-        if expired:
-            logger.info("Startup: deactivated %d expired alerts", expired)
-        if not settings.demo_mode:
-            fixture_count = deactivate_fixture_alerts(db)
-            db.commit()
-            if fixture_count:
-                logger.info(
-                    "Startup: deactivated %d fixture-origin alerts (demo_mode=false)",
-                    fixture_count,
-                )
-        if settings.showcase_mode:
-            await ensure_showcase_data(db)
-            db.commit()
     except Exception:
         db.rollback()
-        logger.exception("Startup expired-alert cleanup failed")
+        logger.exception("Startup pipeline failed")
     finally:
         db.close()
 

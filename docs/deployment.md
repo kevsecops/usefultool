@@ -22,11 +22,12 @@ curl http://localhost:3000
 Default Compose settings (production-like):
 
 - `DEMO_MODE=false` — live ingest from NINA, GDACS, NOAA
+- `STARTUP_PIPELINE_ENABLED=true` — immediate ingest + analysis on container start
 - `SCHEDULER_ENABLED=true` — automatic ingest + briefing every 15 minutes
 - `LLM_ENABLED=false` — rule-based briefings only
 - `LOG_FORMAT=json` — structured logs
 
-The scheduler runs the first ingest ~30s after backend start. No manual CLI needed for normal operation.
+The startup pipeline runs ingest immediately on backend start; the scheduler repeats ingest on the configured interval (first run after `SCHEDULER_STARTUP_DELAY_SECONDS`). No manual CLI needed for normal operation.
 
 ## Required Ports
 
@@ -50,9 +51,12 @@ LLM_ENABLED=false
 ADMIN_TOKEN=<random-32+-char-token>
 LOG_LEVEL=INFO
 LOG_FORMAT=json
+STARTUP_PIPELINE_ENABLED=true
 SCHEDULER_ENABLED=true
 INGEST_INTERVAL_MINUTES=15
 SCHEDULER_GENERATE_BRIEFING=true
+CORRELATION_AUTO_RUN=true
+EXPOSURE_AUTO_IMPORT=true
 ```
 
 ## Services
@@ -79,7 +83,21 @@ No Traefik labels or config are included in `docker-compose.yml`.
 
 ## Scheduled Ingest
 
-### Built-in scheduler (default)
+### Startup pipeline (once per container start)
+
+```env
+STARTUP_PIPELINE_ENABLED=true
+AUTO_GENERATE_BRIEFING=true
+CORRELATION_AUTO_RUN=true
+EXPOSURE_AUTO_IMPORT=true
+EXPOSURE_AUTO_RUN=false
+IMPLICATIONS_AUTO_RUN=false
+SHOWCASE_MODE=false
+```
+
+Steps: migrations → alert cleanup → optional exposure import → ingest (showcase or live) → correlation/exposure/implications/briefing per flags above.
+
+### Built-in scheduler (periodic)
 
 ```env
 SCHEDULER_ENABLED=true

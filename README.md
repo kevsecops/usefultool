@@ -65,12 +65,18 @@ cp .env.example .env
 docker compose up -d --build
 # oder: make up   bzw.   ./scripts/docker-up.sh
 
-# Prüfen (Ingest + Briefing starten automatisch nach ~30s)
+# Prüfen (Startup-Pipeline lädt Daten sofort; Scheduler wiederholt alle 15 Min.)
 curl http://localhost:8000/health
 curl http://localhost:3000
 ```
 
-Der Backend-Scheduler führt **automatisch** alle 15 Minuten Ingest aus und erzeugt danach ein Briefing (`SCHEDULER_ENABLED=true`, `AUTO_GENERATE_BRIEFING=true` in `docker-compose.yml`). Kein manuelles `python -m app.jobs.cli ingest` nötig.
+Beim Backend-Start läuft automatisch:
+
+1. **Migrationen** (`docker-entrypoint.sh` → `alembic upgrade head`)
+2. **Startup-Pipeline** (`STARTUP_PIPELINE_ENABLED=true`): abgelaufene/Fixture-Alerts deaktivieren, optional Exposure-Fixtures importieren, dann Ingest + Analyse
+3. **Scheduler** (`SCHEDULER_ENABLED=true`): wiederholt Ingest alle 15 Minuten (erster Lauf nach `SCHEDULER_STARTUP_DELAY_SECONDS`)
+
+Kein manuelles `python -m app.jobs.cli ingest` nötig — weder für Dev noch für Production-Deployments mit Docker Compose.
 
 **Debugging (optional):**
 
@@ -220,9 +226,15 @@ cd backend && pytest -v
 | `GDACS_USE_FIXTURES` | `false` | GDACS-Fixtures erzwingen |
 | `GDACS_FALLBACK_TO_FIXTURES` | `true` | Bei Live-Fehler auf GDACS-Fixtures zurückfallen |
 | `SCHEDULER_ENABLED` | `false` | Hintergrund-Ingest im Backend-Container aktivieren |
+| `STARTUP_PIPELINE_ENABLED` | `true` | Einmalige Daten-Pipeline beim Container-Start |
 | `INGEST_INTERVAL_MINUTES` | `15` | Intervall für automatischen Ingest (wenn Scheduler aktiv) |
 | `SCHEDULER_GENERATE_BRIEFING` | `true` | Briefing nach jedem geplanten Ingest neu generieren |
-| `SCHEDULER_STARTUP_DELAY_SECONDS` | `30` | Wartezeit nach Container-Start bis erster Ingest |
+| `SCHEDULER_STARTUP_DELAY_SECONDS` | `30` | Wartezeit bis erster Scheduler-Ingest (nach Startup-Pipeline) |
+| `CORRELATION_AUTO_RUN` | `true` | Korrelation nach Ingest (Startup + Scheduler) |
+| `EXPOSURE_AUTO_IMPORT` | `true` | Exposure-Fixtures importieren wenn `assets` leer |
+| `EXPOSURE_AUTO_RUN` | `false` | Exposure-Berechnung nach Korrelation |
+| `IMPLICATIONS_AUTO_RUN` | `false` | Implications nach Exposure-Berechnung |
+| `SHOWCASE_MODE` | `false` | Kuratierte Demo-Szenarien statt Live-Ingest |
 | `LOG_LEVEL` | `INFO` | Log-Level |
 | `LOG_FORMAT` | `json` | `json` (structured) oder `text` (lesbar) |
 
@@ -230,7 +242,33 @@ Vollständige Liste: [.env.example](.env.example)
 
 ## Automatischer Daten-Refresh
 
-**Standard in Docker Compose:** Der eingebaute Backend-Scheduler (`SCHEDULER_ENABLED=true`) führt alle 15 Minuten Ingest und Briefing aus. **n8n ist nicht erforderlich**, wenn der Scheduler aktiv ist — siehe [docs/n8n-integration.md](docs/n8n-integration.md).
+**Standard in Docker Compose:** Beim Container-Start läuft die **Startup-Pipeline** sofort; danach wiederholt der **Backend-Scheduler** alle 15 Minuten Ingest und Briefing. **n8n ist nicht erforderlich** — siehe [docs/n8n-integration.md](docs/n8n-integration.md).
+
+### Startup-Pipeline (einmalig beim Start)
+
+| Schritt | Bedingung | Aktion |
+|---------|-----------|--------|
+| Migrationen | immer | `alembic upgrade head` (Entrypoint) |
+| Alert-Cleanup | `STARTUP_PIPELINE_ENABLED=true` | Abgelaufene + Fixture-Alerts deaktivieren |
+| Exposure-Import | `assets` leer **oder** `EXPOSURE_AUTO_IMPORT=true` | `fixtures/exposure/` laden |
+| Showcase-Ingest | `SHOWCASE_MODE=true` | Kuratierte Szenarien + Korrelation + Exposure + Implications + Briefing |
+| Live-Ingest | `DEMO_MODE=false` und nicht Showcase | Alle `SOURCES_LIVE`-Quellen |
+| Korrelation | `CORRELATION_AUTO_RUN=true` | Nach erfolgreichem Ingest |
+| Exposure | `EXPOSURE_AUTO_RUN=true` | Nach Korrelation |
+| Implications | `IMPLICATIONS_AUTO_RUN=true` | Nach Exposure |
+| Briefing | `AUTO_GENERATE_BRIEFING=true` | Nach Ingest |
+
+`DEMO_MODE=true`: Startup-Pipeline deaktiviert nur Alerts; Ingest manuell per CLI.
+
+```env
+STARTUP_PIPELINE_ENABLED=true
+SCHEDULER_ENABLED=true
+AUTO_GENERATE_BRIEFING=true
+CORRELATION_AUTO_RUN=true
+EXPOSURE_AUTO_IMPORT=true
+```
+
+### Periodischer Scheduler
 
 | Methode | Wann nutzen |
 |---------|-------------|
@@ -238,15 +276,14 @@ Vollständige Liste: [.env.example](.env.example)
 | **cron / systemd timer** | Host mit Docker Compose, Scheduler deaktiviert |
 | **n8n** (optional) | Externe Orchestrierung, Benachrichtigungen, Custom-Workflows |
 
-### Eingebauter Scheduler (Docker)
-
 ```env
 SCHEDULER_ENABLED=true
 INGEST_INTERVAL_MINUTES=15
 SCHEDULER_GENERATE_BRIEFING=true
+SCHEDULER_STARTUP_DELAY_SECONDS=30
 ```
 
-Der Scheduler startet im Backend-Container mit Uvicorn, führt nach 30s Startup-Delay den ersten Ingest aus und wiederholt alle `INGEST_INTERVAL_MINUTES` Minuten. Empfohlene Mindestintervalle pro Quelle: [docs/data-sources.md](docs/data-sources.md#ingest-polling-empfehlung-phase-7).
+Der Scheduler startet im Backend-Container mit Uvicorn, wartet `SCHEDULER_STARTUP_DELAY_SECONDS` und wiederholt dann Ingest alle `INGEST_INTERVAL_MINUTES` Minuten (unabhängig von der sofortigen Startup-Pipeline).
 
 Manuell (weiterhin möglich):
 

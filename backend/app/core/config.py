@@ -101,6 +101,9 @@ class Settings(BaseSettings):
 
     auto_generate_briefing: bool = True
 
+    startup_pipeline_enabled: bool = True
+    exposure_auto_import: bool = False
+
     scheduler_enabled: bool = False
     ingest_interval_minutes: int = 15
     scheduler_generate_briefing: bool = True

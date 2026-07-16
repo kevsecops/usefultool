@@ -62,7 +62,7 @@ With `SHOWCASE_MODE=true`, the backend loads showcase data on startup if no cano
 
 ```bash
 docker compose up -d --build
-# Wait ~30s for startup ingest
+# Showcase ingest runs immediately via STARTUP_PIPELINE_ENABLED
 curl http://localhost:8000/health | jq '.showcase_mode, .canonical_event_count'
 ```
 

@@ -50,11 +50,16 @@ services:
       FIRMS_BASE_URL: "https://firms.modaps.eosdis.nasa.gov"
       FIRMS_USE_FIXTURES: "true"
       # Built-in scheduler handles ingest+briefing — n8n is optional (see docs/n8n-integration.md)
+      STARTUP_PIPELINE_ENABLED: "true"
       SCHEDULER_ENABLED: "true"
       INGEST_INTERVAL_MINUTES: "15"
       SCHEDULER_GENERATE_BRIEFING: "true"
       AUTO_GENERATE_BRIEFING: "true"
       SCHEDULER_STARTUP_DELAY_SECONDS: "30"
+      CORRELATION_AUTO_RUN: "true"
+      EXPOSURE_AUTO_IMPORT: "true"
+      EXPOSURE_AUTO_RUN: "false"
+      IMPLICATIONS_AUTO_RUN: "false"
     volumes:
       - ./fixtures:/app/fixtures:ro
     depends_on:
