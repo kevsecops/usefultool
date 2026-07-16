@@ -2,7 +2,7 @@ import type { Briefing } from "@/types/briefing";
 import type { Stats } from "@/types/stats";
 import type { SourceInfo } from "@/types/source";
 import { categoryLabel, formatDateTime, ingestModeBadgeClass, ingestModeLabel, sourceHealthBadgeClass, sourceHealthLabel, sourceLabel } from "@/lib/format";
-import { distinctSourceCount, resolveBySource } from "@/lib/briefing";
+import { distinctSourceCount, normalizeBriefingContent, resolveBySource } from "@/lib/briefing";
 import Link from "next/link";
 
 interface BriefingViewProps {
@@ -57,7 +57,7 @@ export function BriefingView({
     );
   }
 
-  const content = briefing.content;
+  const content = normalizeBriefingContent(briefing.content);
   const isLlm = briefing.type === "llm";
   const stale = isBriefingStale(briefing, stats);
   const activeCount = snapshotActiveCount(content);
@@ -405,8 +405,8 @@ function ObservedEventsSectionView({
             <span className="font-medium">{item.event_title}</span>
             <span className="text-blue-600">
               {" "}
-              · {item.severity} · {item.observed_count} Observed Event(s) ·{" "}
-              {item.sources.join(", ")}
+              · {item.severity} · {item.observed_count} Observed Event(s)
+              {(item.sources?.length ?? 0) > 0 && <> · {item.sources.join(", ")}</>}
             </span>
           </li>
         ))}
@@ -456,7 +456,7 @@ function ImplicationsSection({
     { key: "technology" as const, label: "Technologie" },
     { key: "finance" as const, label: "Finanzen" },
   ];
-  const hasAny = domains.some((d) => implications[d.key].length > 0);
+  const hasAny = domains.some((d) => (implications[d.key]?.length ?? 0) > 0);
   if (!hasAny) return null;
 
   return (
@@ -470,11 +470,11 @@ function ImplicationsSection({
       <div className="grid gap-4 sm:grid-cols-2">
         {domains.map(
           (d) =>
-            implications[d.key].length > 0 && (
+            (implications[d.key]?.length ?? 0) > 0 && (
               <div key={d.key}>
                 <h4 className="text-sm font-medium text-slate-800">{d.label}</h4>
                 <ul className="mt-1 list-inside list-disc text-sm text-slate-600">
-                  {implications[d.key].map((item, i) => (
+                  {(implications[d.key] ?? []).map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
