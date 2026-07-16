@@ -16,8 +16,8 @@ DEFAULT_TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/usefu
 def _require_test_database_url() -> str:
     """Never run drop_all() against a non-test database (e.g. .env usefultool)."""
     url = (
-        os.environ.pop("DATABASE_URL", None)
-        or os.environ.get("PYTEST_DATABASE_URL")
+        os.environ.get("PYTEST_DATABASE_URL")
+        or os.environ.pop("DATABASE_URL", None)
         or DEFAULT_TEST_DATABASE_URL
     )
     db_name = urlparse(url).path.lstrip("/").split("/")[0]
