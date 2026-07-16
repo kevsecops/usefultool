@@ -9,19 +9,29 @@ from app.api.health import router as health_router
 from app.api.v1 import router as v1_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
+from app.core.middleware import SecurityHeadersMiddleware
 from app.db.session import SessionLocal
 from app.jobs.scheduler import start_scheduler, stop_scheduler
+from app.services.retention_service import run_retention_cleanup
 from app.services.startup_service import run_startup_pipeline
 
 setup_logging()
 settings = get_settings()
 logger = get_logger(__name__)
 
+if settings.is_weak_admin_token():
+    logger.warning(
+        "ADMIN_TOKEN is default or shorter than 32 characters — "
+        "set a strong random token before production deployment"
+    )
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
+        if settings.retention_cleanup_enabled:
+            run_retention_cleanup(db)
         await run_startup_pipeline(db)
         db.commit()
     except Exception:
@@ -30,9 +40,9 @@ async def lifespan(_app: FastAPI):
     finally:
         db.close()
 
-    scheduler_task, stop_event = start_scheduler()
+    scheduler_tasks, stop_event = start_scheduler()
     yield
-    await stop_scheduler(scheduler_task, stop_event)
+    await stop_scheduler(scheduler_tasks, stop_event)
 
 
 app = FastAPI(
@@ -42,6 +52,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],

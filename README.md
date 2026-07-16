@@ -1,7 +1,7 @@
 # Global Risk Intelligence MVP
 
-> **Status: Phase 8 — Showcase Mode & Dashboard Extensions**  
-> PostgreSQL/PostGIS, Live ingest from **NINA (DE), GDACS (international), NOAA (US)** when `DEMO_MODE=false`, Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**, regelbasierter Global Risk Briefing (**LLM deaktiviert by default**).
+> **Status: Phase 9 — Hardening complete**  
+> PostgreSQL/PostGIS, Live ingest from **NINA (DE), GDACS (international), NOAA (US)** when `DEMO_MODE=false`, Fixture-Ingest (`DEMO_MODE=true`), Basis-API mit `bounding_box`-Filter, **Next.js Dashboard mit MapLibre GL JS**, regelbasierter Global Risk Briefing (**LLM deaktiviert by default**), **SHOWCASE_MODE**, per-source scheduler, data retention, CI.
 
 ## Produktbeschreibung
 
@@ -33,6 +33,8 @@
 
 **Showcase Phase 8:** `SHOWCASE_MODE` — kuratierte Demoszenarien, Multi-Layer-Karte, Event-Detail, Dashboard-Erweiterungen. Siehe [docs/showcase.md](docs/showcase.md).
 
+**Phase 9:** Per-source scheduler, data retention, security headers, CI workflow. Siehe [docs/deployment.md](docs/deployment.md), [docs/security.md](docs/security.md).
+
 Details: [docs/data-sources.md](docs/data-sources.md)
 
 ## Architekturübersicht
@@ -60,12 +62,13 @@ Vollständiges Diagramm: [docs/architecture.md](docs/architecture.md)
 
 **Voraussetzungen:** [Docker](https://docs.docker.com/get-docker/) und Docker Compose (kein lokales Node/Python nötig).
 
+### Production / Demo (`make up`)
+
 ```bash
 cp .env.example .env
-docker compose up -d --build
-# oder: make up   bzw.   ./scripts/docker-up.sh
+make up
+# oder: docker compose up -d --build
 
-# Prüfen (Startup-Pipeline lädt Daten sofort; Scheduler wiederholt alle 15 Min.)
 curl http://localhost:8000/health
 curl http://localhost:3000
 ```
@@ -73,8 +76,9 @@ curl http://localhost:3000
 Beim Backend-Start läuft automatisch:
 
 1. **Migrationen** (`docker-entrypoint.sh` → `alembic upgrade head`)
-2. **Startup-Pipeline** (`STARTUP_PIPELINE_ENABLED=true`): abgelaufene/Fixture-Alerts deaktivieren, optional Exposure-Fixtures importieren, dann Ingest + Analyse
-3. **Scheduler** (`SCHEDULER_ENABLED=true`): wiederholt Ingest alle 15 Minuten (erster Lauf nach `SCHEDULER_STARTUP_DELAY_SECONDS`)
+2. **Retention cleanup** — alte inaktive Alerts/Events löschen (wenn aktiviert)
+3. **Startup-Pipeline** (`STARTUP_PIPELINE_ENABLED=true`): abgelaufene/Fixture-Alerts deaktivieren, optional Exposure-Fixtures importieren, dann Ingest + Analyse
+4. **Per-Source-Scheduler** (`SCHEDULER_ENABLED=true`): jede Quelle in `SOURCES_LIVE` auf eigenem Intervall; Briefing separat alle `INGEST_INTERVAL_MINUTES`
 
 Kein manuelles `python -m app.jobs.cli ingest` nötig — weder für Dev noch für Production-Deployments mit Docker Compose.
 
@@ -95,7 +99,7 @@ Migrationen laufen beim Backend-Start automatisch (`docker-entrypoint.sh`). Post
 
 **Logs:** `docker compose logs -f frontend backend` oder `make logs`.
 
-### Entwicklung mit Auto-Reload (empfohlen)
+### Entwicklung mit Auto-Reload (`make dev`)
 
 Für lokale Entwicklung **kein manuelles Rebuild** nach Code-Änderungen nötig:
 
@@ -106,6 +110,13 @@ make dev
 make dev-watch
 ```
 
+| | `make dev` | `make up` |
+|---|------------|-----------|
+| Compose files | `docker-compose.yml` + `docker-compose.dev.yml` | `docker-compose.yml` only |
+| Backend | Uvicorn `--reload` | Production image |
+| Frontend | Next.js dev server (hot reload) | Standalone production build |
+| Use case | Daily coding | Demo deploy, production-like test |
+
 | Was | Verhalten |
 |-----|-----------|
 | Python (`backend/app/`) | Uvicorn `--reload` — Neustart bei `.py`-Änderungen |
@@ -114,7 +125,7 @@ make dev-watch
 
 **Einmalig starten, dann weiter coden** — Änderungen an Anwendungscode werden automatisch übernommen.
 
-**Rebuild/Rebuild nötig bei:**
+**Rebuild nötig bei:**
 
 - `backend/pyproject.toml` / neue Python-Dependencies → `make dev` (baut Backend neu)
 - `frontend/package.json` / neue npm-Pakete → `make dev` (baut Frontend neu)
@@ -143,16 +154,17 @@ curl "http://localhost:8000/api/v1/alerts?country=DE"
 
 ```bash
 # .env: SHOWCASE_MODE=true
-SHOWCASE_MODE=true docker compose up -d --build
+SHOWCASE_MODE=true make up
 
 # Manuell laden
 docker compose exec backend python -m app.jobs.cli showcase-ingest
 
 curl http://localhost:8000/health   # showcase_mode: true
 open http://localhost:3000/events
+open http://localhost:3000/showcase
 ```
 
-Siehe [docs/showcase.md](docs/showcase.md) für die drei kuratierten Szenarien.
+Kuratierte Szenarien: Erdbeben/Port, Geomagnetic Storm, Exposure-Overlay. Siehe [docs/showcase.md](docs/showcase.md).
 
 ### Makefile-Hilfen
 
@@ -257,9 +269,14 @@ cd backend && pytest -v
 | `GDACS_FALLBACK_TO_FIXTURES` | `true` | Bei Live-Fehler auf GDACS-Fixtures zurückfallen |
 | `SCHEDULER_ENABLED` | `false` | Hintergrund-Ingest im Backend-Container aktivieren |
 | `STARTUP_PIPELINE_ENABLED` | `true` | Einmalige Daten-Pipeline beim Container-Start |
-| `INGEST_INTERVAL_MINUTES` | `15` | Intervall für automatischen Ingest (wenn Scheduler aktiv) |
-| `SCHEDULER_GENERATE_BRIEFING` | `true` | Briefing nach jedem geplanten Ingest neu generieren |
+| `INGEST_INTERVAL_MINUTES` | `15` | Fallback-Intervall + Briefing-Scheduler |
+| `SOURCE_SCHEDULES` | — | JSON-Map pro Quelle, z. B. `{"noaa":10,"usgs":5}` |
+| `*_INTERVAL_MINUTES` | — | Pro-Quelle-Override (`NOAA_INTERVAL_MINUTES`, `USGS_INTERVAL_MINUTES`, …) |
+| `SCHEDULER_GENERATE_BRIEFING` | `true` | Briefing auf separatem `INGEST_INTERVAL_MINUTES`-Loop |
 | `SCHEDULER_STARTUP_DELAY_SECONDS` | `30` | Wartezeit bis erster Scheduler-Ingest (nach Startup-Pipeline) |
+| `OBSERVED_EVENTS_RETENTION_DAYS` | `90` | Inaktive Observed Events löschen nach N Tagen |
+| `ALERTS_RETENTION_DAYS` | `30` | Inaktive Alerts löschen nach N Tagen |
+| `RETENTION_CLEANUP_ENABLED` | `true` | Retention beim Start + täglich |
 | `CORRELATION_AUTO_RUN` | `true` | Korrelation nach Ingest (Startup + Scheduler) |
 | `EXPOSURE_AUTO_IMPORT` | `true` | Exposure-Fixtures importieren wenn `assets` leer |
 | `EXPOSURE_AUTO_RUN` | `false` | Exposure-Berechnung nach Korrelation |
@@ -272,7 +289,7 @@ Vollständige Liste: [.env.example](.env.example)
 
 ## Automatischer Daten-Refresh
 
-**Standard in Docker Compose:** Beim Container-Start läuft die **Startup-Pipeline** sofort; danach wiederholt der **Backend-Scheduler** alle 15 Minuten Ingest und Briefing. **n8n ist nicht erforderlich** — siehe [docs/n8n-integration.md](docs/n8n-integration.md).
+**Standard in Docker Compose:** Beim Container-Start läuft die **Startup-Pipeline** sofort; danach pollt der **Per-Source-Scheduler** jede Quelle in `SOURCES_LIVE` auf eigenem Intervall; Briefing läuft separat alle `INGEST_INTERVAL_MINUTES`. **n8n ist nicht erforderlich** — siehe [docs/n8n-integration.md](docs/n8n-integration.md).
 
 ### Startup-Pipeline (einmalig beim Start)
 
@@ -298,7 +315,7 @@ CORRELATION_AUTO_RUN=true
 EXPOSURE_AUTO_IMPORT=true
 ```
 
-### Periodischer Scheduler
+### Periodischer Scheduler (per-source)
 
 | Methode | Wann nutzen |
 |---------|-------------|
@@ -311,9 +328,11 @@ SCHEDULER_ENABLED=true
 INGEST_INTERVAL_MINUTES=15
 SCHEDULER_GENERATE_BRIEFING=true
 SCHEDULER_STARTUP_DELAY_SECONDS=30
+SOURCE_SCHEDULES={"noaa":10,"usgs":5,"gdacs":10,"nina":15}
+# oder: USGS_INTERVAL_MINUTES=5
 ```
 
-Der Scheduler startet im Backend-Container mit Uvicorn, wartet `SCHEDULER_STARTUP_DELAY_SECONDS` und wiederholt dann Ingest alle `INGEST_INTERVAL_MINUTES` Minuten (unabhängig von der sofortigen Startup-Pipeline).
+Jede Quelle in `SOURCES_LIVE` läuft in einem eigenen asyncio-Loop mit konfigurierbarem Intervall (`SOURCE_SCHEDULES` JSON oder `*_INTERVAL_MINUTES`). Briefing-Generierung nutzt `INGEST_INTERVAL_MINUTES` als separates Intervall. Empfohlene Intervalle: [docs/data-sources.md](docs/data-sources.md).
 
 Manuell (weiterhin möglich):
 
@@ -407,13 +426,29 @@ docker compose exec backend python -m app.jobs.cli generate-briefing --type llm
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
+| 0 | Repository Assessment & Showcase-Erweiterung | ✅ |
 | 1 | Planung & Dokumentation | ✅ |
 | 2 | Backend, PostgreSQL/PostGIS, Fixtures, Basis-API | ✅ |
 | 3 | Live NOAA source, bounding_box filter | ✅ |
 | 4 | Dashboard (MapLibre GL JS) | ✅ |
 | 5 | Regelbasierte Analyse & Fallback-Briefing | ✅ |
 | 6 | LLM Cross-Alert-Integration | ✅ |
-| 7 | Live NINA & GDACS, Deployment Hardening | ✅ |
+| 7 | Live NINA & GDACS, LLM Evidence Package | ✅ |
+| 8 | SHOWCASE_MODE, Multi-Layer Dashboard, Event Detail | ✅ |
+| 9 | Per-source Scheduler, Retention, Security, CI | ✅ |
+
+## Bekannte Limitierungen
+
+| Limitierung | Hinweis |
+|-------------|---------|
+| Static Admin Token | Kein OAuth/Rotation — starkes Token setzen (`ADMIN_TOKEN` ≥ 32 Zeichen) |
+| Kein WAF / Rate Limiting | Öffentliche API ungeschützt — Reverse-Proxy empfohlen |
+| LLM optional | Standard regelbasiert; LLM-Halluzinationen möglich bei Aktivierung |
+| FIRMS live | Erfordert `FIRMS_MAP_KEY`; ohne Key Fixture-Fallback |
+| Showcase ≠ Live | `SHOWCASE_MODE=true` lädt kuratierte Demo-Daten, keine amtlichen Warnungen |
+| Per-Source-Scheduler | Parallele Ingests pro Quelle — kein globaler Lock (akzeptabel für MVP) |
+| Retention | Löscht nur **inaktive** Records — aktive Alerts/Events bleiben unbegrenzt |
+| CI ohne Dependabot | `pytest` + `npm run build` only — kein automatisches Dependency-Scanning |
 
 ## Lizenz
 

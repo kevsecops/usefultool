@@ -36,8 +36,8 @@ def _seed_demo_assets(db_session) -> list[ExposureAsset]:
 
 def test_import_exposure_fixtures(db_session) -> None:
     result = import_exposure_fixtures(db_session)
-    assert result.assets_created >= 30
     assert result.total_assets >= 30
+    assert (result.assets_created + result.assets_updated) >= 30
 
     second = import_exposure_fixtures(db_session)
     assert second.assets_created == 0

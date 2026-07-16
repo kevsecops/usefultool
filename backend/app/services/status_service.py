@@ -114,6 +114,7 @@ def get_health_status(db: Session) -> dict:
         "scheduler": {
             "enabled": settings.scheduler_enabled,
             "interval_minutes": settings.ingest_interval_minutes,
+            "per_source": scheduler_module.get_source_schedule_snapshot(),
             "last_run_at": (
                 last_ingest_at.isoformat()
                 if last_ingest_at
@@ -175,6 +176,7 @@ async def get_admin_status(db: Session) -> dict:
         "scheduler": {
             "enabled": settings.scheduler_enabled,
             "interval_minutes": settings.ingest_interval_minutes,
+            "per_source": scheduler_module.get_source_schedule_snapshot(),
             "generate_briefing": settings.scheduler_generate_briefing,
             "startup_delay_seconds": settings.scheduler_startup_delay_seconds,
             "last_run_at": (

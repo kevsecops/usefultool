@@ -472,20 +472,31 @@ Fixtures: `fixtures/firms/mediterranean_points.json`
 | Abdeckung | DE | Global (Natur) | US | Global (EQ) | Global (Natur) | Global (Raumwetter) | Konfigurierbare Area |
 | DEMO_MODE | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures | Fixtures |
 
-## Ingest-Polling-Empfehlung (Phase 7 + Showcase)
+## Ingest-Polling-Empfehlung (Phase 9 — per-source scheduler)
 
-| Quelle | Mindestintervall | Begründung |
-|--------|------------------|------------|
-| NOAA NWS | 30–60s | Cache max-age=5, Rate-Limit-Vorsicht |
-| NOAA SWPC | 5–15 min | Alerts ändern sich schneller als Skalen |
-| NINA | 60–120s | Cache max-age=10, Detail-Fetches |
-| GDACS | 300s | Langsamere Event-Entwicklung |
-| USGS | 60–300s | Feed aktualisiert häufig |
-| EONET | 300–900s | Open-Feed ausreichend |
-| FIRMS | 300–900s | Area-CSV; cluster during ingest; MAP_KEY rate limits |
+| Quelle | Empfohlenes Intervall | Env-Variable | Begründung |
+|--------|----------------------|--------------|------------|
+| NOAA NWS | 10 min | `NOAA_INTERVAL_MINUTES=10` | Cache max-age=5, Rate-Limit-Vorsicht |
+| NOAA SWPC | 15 min | `NOAA_SWPC_INTERVAL_MINUTES=15` | Alerts ändern sich schneller als Skalen |
+| NINA | 15 min | `NINA_INTERVAL_MINUTES=15` | Cache max-age=10, Detail-Fetches |
+| GDACS | 10 min | `GDACS_INTERVAL_MINUTES=10` | Langsamere Event-Entwicklung |
+| USGS | 5 min | `USGS_INTERVAL_MINUTES=5` | Feed aktualisiert häufig |
+| EONET | 30 min | `EONET_INTERVAL_MINUTES=30` | Open-Feed ausreichend |
+| FIRMS | 60 min | `FIRMS_INTERVAL_MINUTES=60` | Area-CSV; cluster during ingest; MAP_KEY rate limits |
 
-**Gesamt-Ingest (alle Quellen):** Mindestens **15 Minuten** empfohlen (`INGEST_INTERVAL_MINUTES=15`). Schnellere Intervalle nur mit quellenspezifischem Scheduling (z. B. n8n) und unter Beachtung der Limits oben.
+**Konfiguration:**
+
+```env
+# JSON map (optional)
+SOURCE_SCHEDULES={"noaa":10,"usgs":5,"gdacs":10,"nina":15,"eonet":30,"noaa_swpc":15,"firms":60}
+
+# Or individual overrides (take precedence over JSON)
+USGS_INTERVAL_MINUTES=5
+NOAA_INTERVAL_MINUTES=10
+```
+
+`INGEST_INTERVAL_MINUTES` bleibt als Fallback für unbekannte Quellen und als Intervall für den separaten Briefing-Scheduler (`SCHEDULER_GENERATE_BRIEFING=true`).
 
 Automatisierung:
-- **Eingebaut:** `SCHEDULER_ENABLED=true` im Backend-Container ([docs/deployment.md](deployment.md))
+- **Eingebaut:** `SCHEDULER_ENABLED=true` — ein asyncio-Task pro Quelle in `SOURCES_LIVE` ([docs/deployment.md](deployment.md))
 - **Extern:** cron, systemd, n8n ([docs/n8n-integration.md](n8n-integration.md))

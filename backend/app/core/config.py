@@ -1,9 +1,22 @@
 """Application configuration."""
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_SOURCE_INTERVALS: dict[str, int] = {
+    "nina": 15,
+    "gdacs": 10,
+    "noaa": 10,
+    "usgs": 5,
+    "eonet": 30,
+    "noaa_swpc": 15,
+    "firms": 60,
+}
+
+DEFAULT_ADMIN_TOKENS = frozenset({"dev-admin-token", "change-me-in-production"})
 
 
 class Settings(BaseSettings):
@@ -108,6 +121,18 @@ class Settings(BaseSettings):
     ingest_interval_minutes: int = 15
     scheduler_generate_briefing: bool = True
     scheduler_startup_delay_seconds: int = 30
+    source_schedules: str = ""
+    nina_interval_minutes: int | None = None
+    gdacs_interval_minutes: int | None = None
+    noaa_interval_minutes: int | None = None
+    usgs_interval_minutes: int | None = None
+    eonet_interval_minutes: int | None = None
+    noaa_swpc_interval_minutes: int | None = None
+    firms_interval_minutes: int | None = None
+
+    observed_events_retention_days: int = 90
+    alerts_retention_days: int = 30
+    retention_cleanup_enabled: bool = True
 
     correlation_time_window_hours: float = 24.0
     correlation_distance_km: float = 150.0
@@ -117,6 +142,55 @@ class Settings(BaseSettings):
     exposure_auto_run: bool = False
 
     implications_auto_run: bool = False
+
+    def parsed_source_schedules(self) -> dict[str, int]:
+        """Per-source ingest intervals from SOURCE_SCHEDULES JSON and *_INTERVAL_MINUTES env vars."""
+        schedules: dict[str, int] = {}
+        if self.source_schedules.strip():
+            try:
+                raw = json.loads(self.source_schedules)
+            except json.JSONDecodeError:
+                raw = {}
+            if isinstance(raw, dict):
+                for key, value in raw.items():
+                    if isinstance(key, str) and isinstance(value, int | float):
+                        schedules[key.strip().lower()] = max(int(value), 1)
+
+        per_source = {
+            "nina": self.nina_interval_minutes,
+            "gdacs": self.gdacs_interval_minutes,
+            "noaa": self.noaa_interval_minutes,
+            "usgs": self.usgs_interval_minutes,
+            "eonet": self.eonet_interval_minutes,
+            "noaa_swpc": self.noaa_swpc_interval_minutes,
+            "firms": self.firms_interval_minutes,
+        }
+        for source_id, minutes in per_source.items():
+            if minutes is not None:
+                schedules[source_id] = max(minutes, 1)
+        return schedules
+
+    def get_source_interval_minutes(self, source_id: str) -> int:
+        schedules = self.parsed_source_schedules()
+        if source_id in schedules:
+            return schedules[source_id]
+        if source_id in DEFAULT_SOURCE_INTERVALS:
+            return DEFAULT_SOURCE_INTERVALS[source_id]
+        return max(self.ingest_interval_minutes, 1)
+
+    def get_scheduled_source_ids(self) -> list[str]:
+        from app.sources.registry import _ADAPTERS
+
+        if self.showcase_mode:
+            return []
+        if self.demo_mode:
+            return list(_ADAPTERS.keys())
+        live = [s.strip().lower() for s in self.sources_live.split(",") if s.strip()]
+        return [source_id for source_id in live if source_id in _ADAPTERS]
+
+    def is_weak_admin_token(self) -> bool:
+        token = (self.admin_token or "").strip()
+        return not token or token in DEFAULT_ADMIN_TOKENS or len(token) < 32
 
 
 @lru_cache

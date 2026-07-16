@@ -1,6 +1,6 @@
 # Deployment — Docker Compose
 
-> **Status:** Phase 7 — container-only deployment (primary)
+> **Status:** Phase 9 — container-only deployment (primary)
 
 ## Prerequisites
 
@@ -97,14 +97,32 @@ SHOWCASE_MODE=false
 
 Steps: migrations → alert cleanup → optional exposure import → ingest (showcase or live) → correlation/exposure/implications/briefing per flags above.
 
-### Built-in scheduler (periodic)
+### Built-in scheduler (per-source, periodic)
 
 ```env
 SCHEDULER_ENABLED=true
 INGEST_INTERVAL_MINUTES=15
 SCHEDULER_GENERATE_BRIEFING=true
 SCHEDULER_STARTUP_DELAY_SECONDS=30
+
+# Per-source intervals (minutes) — see docs/data-sources.md for recommendations
+SOURCE_SCHEDULES={"noaa":10,"usgs":5,"gdacs":10,"nina":15}
+# USGS_INTERVAL_MINUTES=5
 ```
+
+Each source in `SOURCES_LIVE` runs on its own asyncio loop at the configured interval. Briefing generation runs on a separate loop at `INGEST_INTERVAL_MINUTES` when `SCHEDULER_GENERATE_BRIEFING=true`.
+
+### Data retention
+
+Inactive records are purged on startup and daily when retention is enabled:
+
+```env
+OBSERVED_EVENTS_RETENTION_DAYS=90
+ALERTS_RETENTION_DAYS=30
+RETENTION_CLEANUP_ENABLED=true
+```
+
+Only **inactive** alerts and observed events with `last_seen_at` older than the retention window are deleted. Active records are never removed by retention.
 
 ### External scheduler (optional)
 
@@ -114,13 +132,14 @@ Disable the built-in scheduler and use cron, systemd, or n8n — see [docs/n8n-i
 docker compose exec -T backend python -m app.jobs.cli ingest
 ```
 
-| Source | Minimum interval | Rationale |
-|--------|------------------|-----------|
-| NOAA | 30–60s | Cache max-age=5, rate-limit caution |
-| NINA | 60–120s | Detail fetches per alert |
-| GDACS | 300s | Slower event evolution |
+| Source | Default interval | Env override | Rationale |
+|--------|------------------|--------------|-----------|
+| NOAA | 10 min | `NOAA_INTERVAL_MINUTES` | Cache max-age=5, rate-limit caution |
+| NINA | 15 min | `NINA_INTERVAL_MINUTES` | Detail fetches per alert |
+| GDACS | 10 min | `GDACS_INTERVAL_MINUTES` | Slower event evolution |
+| USGS | 5 min | `USGS_INTERVAL_MINUTES` | Frequent earthquake feed updates |
 
-For MVP, `INGEST_INTERVAL_MINUTES=15` is a safe default.
+`INGEST_INTERVAL_MINUTES=15` is the fallback and briefing scheduler interval.
 
 ## Migrations
 
