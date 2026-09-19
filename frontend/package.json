@@ -12,8 +12,8 @@
     "isomorphic-dompurify": "^2.22.0",
     "maplibre-gl": "^5.4.0",
     "next": "^15.3.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "supercluster": "^8.0.1"
   },
   "devDependencies": {
